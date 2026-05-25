@@ -1,0 +1,8 @@
+MetaTrader5
+pandas
+numpy
+pytz
+requests
+matplotlib
+seaborn
+python-dotenv

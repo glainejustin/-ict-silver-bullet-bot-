@@ -1,0 +1,57 @@
+# === Sensitive / Credentials ===
+.env
+*.env
+!*.env.example
+
+# === Bot State (contains account IDs, balances) ===
+bot_state.json
+news_cache.json
+
+# === Logs ===
+*.log
+
+# === Python Cache ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# === Python Virtual Environment ===
+venv/
+.venv/
+env/
+
+# === Python Packaging ===
+*.egg-info/
+*.egg
+dist/
+build/
+
+# === Generated / Output Files ===
+backtesting/*.png
+backtesting/*.json
+backtesting/*.md
+final_backtest.png
+test_output.txt
+test_news_cache.json
+
+# === Editor Backup Files ===
+*.bak
+*.orig
+*~
+*.swp
+*.swo
+
+# === OS Files ===
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# === IDE ===
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# === Misc ===
+.python-version
