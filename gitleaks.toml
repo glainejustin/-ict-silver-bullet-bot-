@@ -6,8 +6,8 @@ title = "ICT Silver Bullet Bot — Gitleaks Configuration"
 
 [[rules]]
 id = "telegram-bot-token"
-description = "Telegram Bot Token"
-regex = '''\b\d{8,10}:A[A-Za-z0-9_-]{34,35}\b'''
+description = "Telegram Bot Token (format: digits:AA...)"
+regex = '''\b\d{8,10}:AA[A-Za-z0-9_-]{33,34}\b'''
 entropy = 3.5
 keywords = [
   "telegram",
@@ -36,8 +36,8 @@ regexes = [ "123456789" ]
 
 [[rules]]
 id = "generic-api-key-high-entropy"
-description = "High-entropy generic API keys (likely secrets)"
-regex = '''(?i)(api[_-]?key|apikey|secret|password|passwd|token|auth)\s*[:=]\s*['"][A-Za-z0-9+/=_-]{20,}['"]'''
+description = "High-entropy generic API keys (quoted or unquoted)"
+regex = '''(?i)(api[_-]?key|apikey|secret|password|passwd|token|auth)\s*[:=]\s*['"]?([A-Za-z0-9+/=_-]{20,})['"]?'''
 entropy = 4.0
 keywords = [
   "api_key",
@@ -54,6 +54,24 @@ keywords = [
   "AUTH",
 ]
 
+[[rules]]
+id = "mt5-credentials"
+description = "MT5 account ID / login / server / password"
+regex = '''(?i)(MT5[_-]?(ACCOUNT|LOGIN|SERVER|PASSWORD)|mt5[_-]?(account|login|server|password))\s*[:=]\s*['"]?(\S+)['"]?'''
+entropy = 2.0
+keywords = [
+  "MT5_ACCOUNT",
+  "MT5_LOGIN",
+  "MT5_SERVER",
+  "MT5_PASSWORD",
+  "mt5_account",
+  "mt5_login",
+  "mt5_server",
+  "mt5_password",
+  "account_id",
+  "ACCOUNT_ID",
+]
+
 # ────────────────────────────────────────────
 # Allowlist — known safe false positives
 # ────────────────────────────────────────────
@@ -68,5 +86,5 @@ regexes = [
   '''YOUR_CHAT_ID''',                                    # .env.example placeholder
 ]
 paths = [
-  '''gitleaks\.toml''',                                  # This config file itself
+  '''gitleaks.toml''',                                  # This config file itself
 ]
