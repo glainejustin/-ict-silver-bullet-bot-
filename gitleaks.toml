@@ -1,0 +1,72 @@
+title = "ICT Silver Bullet Bot — Gitleaks Configuration"
+
+# ────────────────────────────────────────────
+# Custom Rules
+# ────────────────────────────────────────────
+
+[[rules]]
+id = "telegram-bot-token"
+description = "Telegram Bot Token"
+regex = '''\b\d{8,10}:A[A-Za-z0-9_-]{34,35}\b'''
+entropy = 3.5
+keywords = [
+  "telegram",
+  "bot_token",
+  "bot-token",
+  "TELEGRAM_BOT_TOKEN",
+  "BOT_TOKEN",
+  "t.me",
+]
+
+[[rules]]
+id = "telegram-chat-id"
+description = "Telegram Chat ID (high-confidence — 9-10 digit numbers with Telegram context)"
+regex = '''\b\d{9,10}\b'''
+entropy = 2.0
+keywords = [
+  "chat_id",
+  "chat-id",
+  "CHAT_ID",
+  "TELEGRAM_CHAT_ID",
+  "chatid",
+]
+[ rules.allowlist ]
+description = "Allow chat ID in .env.example (placeholder '123456789')"
+regexes = [ "123456789" ]
+
+[[rules]]
+id = "generic-api-key-high-entropy"
+description = "High-entropy generic API keys (likely secrets)"
+regex = '''(?i)(api[_-]?key|apikey|secret|password|passwd|token|auth)\s*[:=]\s*['"][A-Za-z0-9+/=_-]{20,}['"]'''
+entropy = 4.0
+keywords = [
+  "api_key",
+  "apikey",
+  "secret",
+  "password",
+  "passwd",
+  "token",
+  "auth",
+  "API_KEY",
+  "SECRET",
+  "PASSWORD",
+  "TOKEN",
+  "AUTH",
+]
+
+# ────────────────────────────────────────────
+# Allowlist — known safe false positives
+# ────────────────────────────────────────────
+
+[allowlist]
+description = "Global allowlist for known non-secret values"
+regexes = [
+  '''1234567890''',                                      # Fake token prefix from README
+  '''ABCdefGHIjklMNOpqrsTUVwxyz''',                     # Fake token suffix from README
+  '''1234567890:ABCdefGHIjklMNOpqrsTUVwxyz''',          # Full fake token from README
+  '''your_bot_token_here''',                             # .env.example placeholder
+  '''YOUR_CHAT_ID''',                                    # .env.example placeholder
+]
+paths = [
+  '''gitleaks\.toml''',                                  # This config file itself
+]
