@@ -392,7 +392,7 @@ This project is licensed under the **MIT License** — see [LICENSE](LICENSE) fo
 ## 🙏 Acknowledgments
 
 - **[ICT (Inner Circle Trader)](https://www.youtube.com/@InnerCircleTrader)** — Smart Money Concepts methodology
-- **FundedNext / FTMO** — Challenge structure and risk rule inspiration
+- **FundedNext / FundingPiops** — Challenge structure and risk rule inspiration
 - **MetaQuotes** — MetaTrader 5 and its Python API
 - **python-dotenv** — Secure credential management
 
