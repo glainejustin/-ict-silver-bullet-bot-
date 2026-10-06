@@ -1,5 +1,7 @@
 # Property Sourcing Autopilot 🏠🤖
 
+[![Property Sourcing Autopilot Tests](https://github.com/glainejustin/-ict-silver-bullet-bot-/actions/workflows/property-sourcing-tests.yml/badge.svg)](https://github.com/glainejustin/-ict-silver-bullet-bot-/actions/workflows/property-sourcing-tests.yml)
+
 > 🚧 **Status: build-now, launch-later project.** If your current UK
 > immigration status doesn't permit self-employment/running a business (e.g.
 > a Skilled Worker visa), this is being developed and tested purely as a
@@ -121,6 +123,8 @@ run_pipeline.py CLI to run everything once (supports --demo)
 seed/           offline demo data + your buyer CRM starter file
 tests/          automated tests (run `pytest`), including a full offline
                 end-to-end pipeline test and mocked tests for every connector
+                — these run automatically on every push via GitHub Actions
+                (see `.github/workflows/property-sourcing-tests.yml`)
 docs/           legal compliance checklist, launch checklist, sourcing
                 agreement template, deployment guide, architecture notes
 deploy/systemd/ ready-made systemd service files for VPS deployment
