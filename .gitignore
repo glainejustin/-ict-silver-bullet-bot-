@@ -27,6 +27,10 @@ env/
 dist/
 build/
 
+# === Research Data (large historical price files - re-fetch with research/fetch_data.py) ===
+research/data/
+research/out/
+
 # === Generated / Output Files ===
 backtesting/*.png
 backtesting/*.json

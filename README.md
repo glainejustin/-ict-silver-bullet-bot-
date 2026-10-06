@@ -28,6 +28,28 @@
 
 ---
 
+## ⚠️ READ THIS FIRST — measured results on real XAUUSD data
+
+Every strategy in this repo was tested against **1,162,584 M1 bars (2023-2026) and 480,717 M15 bars (21.3 years) of real XAUUSD**, including spread, commission and slippage. The full study is in **[XAUUSD_EDGE_REPORT.md](XAUUSD_EDGE_REPORT.md)**. The headlines:
+
+| Strategy | Trades tested | Expectancy | Verdict |
+|---|---|---|---|
+| Silver Bullet / Raja Banks / Pure Price Action (sweep→reclaim FVG) | 27,135 | **−0.27R per trade** | **Loses.** Worse than random even before costs |
+| Breakout continuation | 26,541 | −0.28R | Loses |
+| Trend pullback / momentum | 17,385 / 48,818 | −0.29R / −0.28R | Loses |
+| Random entries (null model) | 20,000 | −0.43R | benchmark |
+| **GoldTrendStrategy (long-only H4 Donchian + ATR trail)** | 582 (21y) | **+0.21R** | **Positive out-of-sample** |
+
+**Why the ICT strategies lose is arithmetic, not luck:** a 25-point gold spread shifts your target further and your stop closer by $0.25 each. With 1R ≈ $4 on M5, friction alone costs **0.17R per trade** — and it removes ~8-9 percentage points of win-rate. The same spread costs only **0.01R** on an H4 stop. Frequency and stop size had to change; no amount of parameter tuning fixes this.
+
+**Enabled by default:** `GoldTrendStrategy` on XAUUSD only. Walk-forward validated (parameters chosen on prior 4 years, traded untouched): **+27.1% over 17 out-of-sample years, 12/17 positive, worst year −4.1%, worst drawdown −3.8%** at 0.5% risk. It trades ~1.3 times a **month**.
+
+**Honest expectation:** with a genuine edge of +0.2R/trade and ~27 trades/year, this compounds to single-digit annual percentages with small drawdowns — *not* 8% in 30 days. An 8%/30-day funded challenge with this edge has a 3-15% pass rate ([research/challenge_sim.py](research/challenge_sim.py)). Anything promising more is selling you variance.
+
+**Reproduce it yourself:** `python research/run_all.py`
+
+---
+
 ## 📖 Table of Contents
 
 - [Overview](#-overview)
@@ -52,19 +74,18 @@
 
 ## 📖 Overview
 
-The ICT Silver Bullet Bot is a modular algorithmic trading system built on the **MetaTrader 5 Python API**. It executes **4 institutional-grade strategies** across **5 currency pairs** using ICT/SMC (Smart Money Concepts) — institutional order flow, market structure shifts, and fair value gaps.
+The ICT Silver Bullet Bot is a modular algorithmic trading system built on the **MetaTrader 5 Python API**, with a research harness that measures whether a strategy actually has an edge before it is allowed near an account.
 
-Designed specifically for **funded challenge accounts** (FundedNext, FTMO, etc.), the bot enforces challenge rules via a professional risk guardian: daily loss limits, profit targets, trailing drawdown, and Friday close-out.
+**Default configuration:** one validated strategy (`GoldTrendStrategy`) on **XAUUSD**. The legacy intraday ICT strategies remain in the repo for study and backtesting, but are disabled because each measured a negative expectancy over tens of thousands of real trades. See [XAUUSD_EDGE_REPORT.md](XAUUSD_EDGE_REPORT.md).
+
+The bot enforces challenge rules via a risk guardian: daily loss limits, profit targets, trailing drawdown, and Friday close-out.
 
 ### Supported Instruments
 
-| Symbol | Type | Strategies |
-|--------|------|------------|
-| **XAUUSD** | Gold (Spot) | Silver Bullet · Raja Banks · Pure Price Action |
-| **GBPJPY** | Forex (Major Cross) | Silver Bullet · Raja Banks · Pure Price Action |
-| **EURUSD** | Forex (Major) | Silver Bullet · Pure Price Action |
-| **AUDUSD** | Forex (Major) | Silver Bullet · Pure Price Action |
-| **USDJPY** | Forex (Major) | Silver Bullet · Pure Price Action |
+| Symbol | Type | Strategy (default) | Notes |
+|--------|------|--------------------|-------|
+| **XAUUSD** | Gold (Spot) | GoldTrend (H4 breakout + ATR trail) | The only symbol/strategy combination validated out-of-sample |
+| GBPJPY / EURUSD / AUDUSD / USDJPY | Forex | *disabled* | Legacy ICT strategies measured −0.15R to −0.40R per trade on gold; they have not been researched on these pairs. Set `LEGACY_STRATEGIES_ENABLED = True` only after you validate them yourself |
 
 ---
 
@@ -72,12 +93,15 @@ Designed specifically for **funded challenge accounts** (FundedNext, FTMO, etc.)
 
 ### 📊 Strategy Arsenal
 
-| Strategy | Timeframe | Description |
-|----------|-----------|-------------|
-| **Silver Bullet** | M5 | ICT Silver Bullet window (10-11 AM & 2-3 PM NY). Sweep → MSS → Displacement → FVG entry with limit orders |
-| **Raja Banks** | H4 + M5 | H4 structural break confirmed by M5 sniper entry. 2:1 risk-reward targeting liquidity pools |
-| **Pure Price Action** | H4 + M5 | H4 support/resistance rejection with wick confirmation and clean traffic validation |
-| **London Breakout** | M15 | 8:00-8:30 AM London range breakout with pending orders (available, disabled by default) |
+| Strategy | Timeframe | Status | Description |
+|----------|-----------|--------|-------------|
+| **GoldTrend** ⭐ | H4 | **enabled** | Donchian(55) breakout, 2×ATR stop, 4×ATR chandelier trail, long-only, ~1.3 trades/month. +0.21R/trade over 21 years, walk-forward validated |
+| Silver Bullet | M5 | disabled | ICT Silver Bullet window (10-11 AM & 2-3 PM NY). Sweep → MSS → Displacement → FVG entry. Measured −0.39R/trade |
+| Raja Banks | H4 + M5 | disabled | H4 structural break + M5 sniper entry. Measured −0.15R to −0.27R/trade |
+| Pure Price Action | H4 + M5 | disabled | H4 S/R rejection with wick confirmation. Measured −0.15R to −0.29R/trade |
+| London Breakout | M15 | disabled | 8:00-8:30 AM London range breakout. Measured −0.26R/trade |
+
+> The timezone and session bugs that made these strategies backtest better than they traded live have been fixed (`core/time_utils.session_time`, see report §2). Their *expectancy* is still negative — the bug fixes change **when** they trade, not **whether** the pattern works.
 
 ### 🛡️ Risk Guardian (Funded Challenge Compliant)
 
@@ -140,10 +164,24 @@ ict_silver_bullet_bot/
 │
 ├── strategies/                 # Trading strategies (ABC pattern)
 │   ├── base.py                 # Abstract base class
+│   ├── gold_trend.py           # ⭐ GoldTrend: validated H4 breakout + ATR trail
 │   ├── silver_bullet.py        # ICT Silver Bullet (M5 FVG + displacement)
 │   ├── raja_banks.py           # H4 break + M5 sniper
 │   ├── london_breakout.py      # London range breakout
 │   └── pure_price_action.py    # H4 S/R rejection
+│
+├── research/                   # Evidence-first research pipeline
+│   ├── xau_data.py             # clean M1/M5/H1/H4 build with true UTC + session clocks
+│   ├── fetch_data.py           # downloads the historical XAUUSD data
+│   ├── setups.py               # ICT setup mining + forward-path measurement
+│   ├── family_search.py        # 20+ entry families vs a matched null model
+│   ├── edge_test.py            # directional skill vs cost drag
+│   ├── gold_edge.py            # intraday drift + Donchian trend system
+│   ├── long_history.py         # 21-year walk-forward validation
+│   ├── validate_live.py        # replays the shipping strategy module end-to-end
+│   ├── challenge_sim.py        # funded-challenge pass probability
+│   ├── check_config_parity.py  # guards research config vs shipped config
+│   └── run_all.py              # one command to reproduce the whole study
 │
 ├── backtesting/                # Generated reports & charts (gitignored)
 │
@@ -236,14 +274,15 @@ Edit `config.py` to match your funded challenge parameters:
 
 ```python
 # === Core Risk Settings ===
-RISK_PERCENT = 1.0                    # Risk per trade (% of balance)
+RISK_PERCENT = 0.75                   # Risk per trade (% of balance) - validated default
 MAX_DAILY_LOSS_PERCENT = 4.0          # Daily loss limit
 OVERALL_PROFIT_TARGET_PERCENT = 8.0   # Challenge profit target
 MAX_TOTAL_LOSS_PERCENT = 8.0          # Max total drawdown
-MAX_DAILY_TRADES = 6                  # Max entries per day
+MAX_DAILY_TRADES = 2                  # Safety cap (the system averages ~1.3 trades/MONTH)
+DAILY_GOAL_PERCENT = 0.0              # 0 = disabled; a daily profit stop clips trend runners
 
 # === Trading Pairs ===
-SYMBOLS = ["XAUUSD", "GBPJPY", "EURUSD", "AUDUSD", "USDJPY"]
+SYMBOLS = ["XAUUSD"]                  # Only the validated instrument is enabled
 ```
 
 > 💡 **Tip for challenge accounts:** Match these values to your specific challenge rules. FTMO and FundedNext have slightly different parameters — check your dashboard.
@@ -276,9 +315,36 @@ python main.py
 
 ---
 
+## 🔬 Research Harness (start here)
+
+The repo ships a full research pipeline that tests any strategy against real gold data, real costs, and a **matched random-entry null model** — because a strategy that returns −0.10R when random entries return −0.09R has no edge, it is just paying the spread twice.
+
+```bash
+python research/fetch_data.py    # download the historical data (once)
+python research/xau_data.py      # build timezone-correct M1/M5/H1/H4 frames
+python research/run_all.py       # run the whole study (~10-15 min)
+```
+
+Key extra checks:
+
+```bash
+python research/validate_live.py        # replays the SHIPPING strategy file end-to-end
+python research/check_config_parity.py  # fails if research config drifts from config.py
+python research/challenge_sim.py        # prop-challenge pass/fail probabilities
+```
+
+Read [XAUUSD_EDGE_REPORT.md](XAUUSD_EDGE_REPORT.md) for the results.
+
+---
+
 ## 📊 Backtesting
 
 The bot includes a tick-level backtester that validates exits using M1 data for accuracy.
+
+> ⚠️ `backtest_combined.py` predates the research harness and shares some of the
+> flawed assumptions documented in the report (it does not charge the spread on
+> entry, and its realism is lower than `research/`). Prefer the research harness
+> for judging a strategy.
 
 ```bash
 # Run a 3-month backtest across all symbols
@@ -332,10 +398,16 @@ Once running, you control the bot entirely through Telegram:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `SYMBOLS` | `["XAUUSD", ...]` | Trading instruments (5 pairs) |
-| `RISK_PERCENT` | `1.0` | Risk per trade (% of balance) |
+| `RISK_PERCENT` | `0.75` | Risk per trade (% of balance); validated default |
+| `GOLD_TREND_LOOKBACK` | `55` | Donchian window in H4 bars |
+| `GOLD_TREND_STOP_ATR` | `2.0` | Initial stop = 2.0 × ATR(H4) |
+| `GOLD_TREND_TRAIL_ATR` | `4.0` | Chandelier trail = 4.0 × ATR(H4) |
+| `MIN_STOP_DISTANCE_POINTS` | XAUUSD `400` | Refuse setups whose stop is too tight for the spread |
+| `MAX_COST_RATIO_OF_R` | `0.12` | Block trades where spread+commission > 12% of 1R |
 | `MAGIC_NUMBER` | `786786` | MT5 magic number (unique per bot instance) |
-| `MAX_DAILY_TRADES` | `6` | Maximum entries per trading day |
+| `MAX_DAILY_TRADES` | `2` | Safety cap on entries per trading day |
 | `DAILY_PROFIT_TARGET_PERCENT` | `3.0` | Auto-pause when daily profit hits this |
+| `DAILY_GOAL_PERCENT` | `0.0` | Daily profit stop — disabled by default (clips trend runners) |
 | `MAX_DAILY_LOSS_PERCENT` | `4.0` | Hard daily stop-loss |
 | `MAX_TOTAL_LOSS_PERCENT` | `8.0` | Permanent halt (challenge blown) |
 | `MAX_TRAILING_DRAWDOWN_PERCENT` | `5.0` | Halt if equity drops from peak |

@@ -10,6 +10,34 @@ class TradeManager:
         self.partial_done = set(partial_done) if partial_done else set()
         self.breakeven_done = set(breakeven_done) if breakeven_done else set()
         self.initial_risks = initial_risks if initial_risks else {} # Stores {ticket: initial_risk_pips}
+        # {ticket: {"strategy": str, **management plan}} set when the trade opens
+        self.plans = {}
+
+    def set_plan(self, ticket: int, strategy_name: str, plan: dict) -> None:
+        """
+        Store the entry strategy's management plan (trail multiple, trail timeframe,
+        partial-TP and breakeven policy). Without this, live exits use one generic
+        policy and no longer match whatever was backtested.
+        """
+        if not plan:
+            return
+        self.plans[ticket] = {"strategy": strategy_name, **plan}
+
+    def _plan_for(self, ticket: int, strategy_name: str = "") -> dict:
+        plan = self.plans.get(ticket)
+        if plan:
+            return plan
+        # fall back to config default, matched on strategy name prefix
+        for prefix, cfg in getattr(config, "STRATEGY_MANAGEMENT", {}).items():
+            if strategy_name.startswith(prefix):
+                return cfg
+        return getattr(config, "DEFAULT_MANAGEMENT", {
+            "trail_atr_mult": config.PARTIAL_TP_RR and 2.5,
+            "trail_atr_timeframe": "M5",
+            "partial_tp_rr": config.PARTIAL_TP_RR,
+            "breakeven_rr": config.BREAKEVEN_RR,
+            "trail_after_r": 1.0,
+        })
 
     def _get_filling_mode(self, symbol, symbol_cache=None):
         sym_info = symbol_cache.get_info(symbol) if symbol_cache else mt5.symbol_info(symbol)
@@ -29,6 +57,10 @@ class TradeManager:
                 self.partial_done.discard(t)
                 self.breakeven_done.discard(t)
                 self.initial_risks.pop(t, None)
+                self.plans.pop(t, None)
+        for t in list(self.plans):
+            if not mt5.positions_get(ticket=t):
+                self.plans.pop(t, None)
 
         positions = mt5.positions_get(symbol=symbol)
         if not positions: return
@@ -57,7 +89,12 @@ class TradeManager:
             is_be = ticket in self.breakeven_done
             has_taken_partial = ticket in self.partial_done
 
-            if current_rr >= config.PARTIAL_TP_RR and not has_taken_partial:
+            plan = self._plan_for(ticket, self.plans.get(ticket, {}).get("strategy", ""))
+            partial_rr = float(plan.get("partial_tp_rr") or 0.0)
+            be_rr = float(plan.get("breakeven_rr") or 0.0)
+            trail_after_r = float(plan.get("trail_after_r") or 0.0)
+
+            if partial_rr > 0 and current_rr >= partial_rr and not has_taken_partial:
                  close_vol = round(volume * config.PARTIAL_TP_PCT / sym_info.volume_step) * sym_info.volume_step
                  if close_vol >= sym_info.volume_min:
                      # Check if remaining volume would be valid
@@ -74,16 +111,18 @@ class TradeManager:
                      self.breakeven_done.add(ticket)
                      continue
 
-            if current_rr >= config.BREAKEVEN_RR and not is_be:
+            if be_rr > 0 and current_rr >= be_rr and not is_be:
                 is_safe = (pos_type == 0 and current_price > entry_price) or (pos_type == 1 and current_price < entry_price)
                 if is_safe:
                     logger.info(f"[{symbol}] Moving SL to Breakeven.")
                     self.modify_sl(ticket, entry_price, pos.tp)
                     self.breakeven_done.add(ticket)
 
-            if current_rr >= 1.0:
+            if current_rr >= trail_after_r:
                 import numpy as np
-                rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_M5, 0, 15)
+                tf_name = str(plan.get("trail_atr_timeframe", "M5")).upper()
+                tf_const = getattr(mt5, f"TIMEFRAME_{tf_name}", mt5.TIMEFRAME_M5)
+                rates = mt5.copy_rates_from_pos(symbol, tf_const, 0, 15)
                 if rates is not None and len(rates) > 1:
                     tr = np.maximum(rates['high'][1:] - rates['low'][1:], 
                                     np.maximum(np.abs(rates['high'][1:] - rates['close'][:-1]), 
@@ -92,10 +131,7 @@ class TradeManager:
                 else:
                     atr = initial_risk_pips * pip_size
                 
-                if current_rr >= 2.0:
-                    trail_dist = atr * 1.5
-                else:
-                    trail_dist = atr * 2.5
+                trail_dist = atr * float(plan.get("trail_atr_mult", 2.5))
                     
                 if pos_type == 0:
                     new_sl = current_price - trail_dist
@@ -130,5 +166,6 @@ class TradeManager:
         return {
             "initial_risks": {str(k): v for k, v in self.initial_risks.items()},
             "partial_done": list(self.partial_done),
-            "breakeven_done": list(self.breakeven_done)
+            "breakeven_done": list(self.breakeven_done),
+            "plans": {str(k): v for k, v in self.plans.items()},
         }

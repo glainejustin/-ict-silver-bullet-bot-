@@ -30,6 +30,7 @@ from strategies.raja_banks import RajaBanksStrategy
 from strategies.london_breakout import LondonBreakoutStrategy
 from strategies.silver_bullet import SilverBulletStrategy
 from strategies.pure_price_action import PurePriceActionStrategy
+from strategies.gold_trend import GoldTrendStrategy
 import pytz
 
 # Configuration
@@ -268,6 +269,8 @@ def main():
                 strats_for_symbol.append(SilverBulletStrategy(f"Silver_{symbol}", symbol))
             elif s_name == "PurePriceActionStrategy":
                 strats_for_symbol.append(PurePriceActionStrategy(f"PurePA_{symbol}", symbol))
+            elif s_name == "GoldTrendStrategy":
+                strats_for_symbol.append(GoldTrendStrategy(f"GoldTrend_{symbol}", symbol))
             
         if strats_for_symbol:
             aggregator = SignalAggregator(strategies=strats_for_symbol, min_confidence_threshold=1.0)
@@ -410,8 +413,12 @@ def main():
             current_equity = acc_info.equity
             daily_pnl_pct = ((current_equity - day_start_equity) / day_start_equity) * 100 if day_start_equity > 0 else 0
             
-            # Check for Daily Goal or Max Loss
-            if daily_pnl_pct >= getattr(config, 'DAILY_GOAL_PERCENT', getattr(config, 'DAILY_PROFIT_TARGET_PERCENT', 5.0)) or daily_pnl_pct <= -config.MAX_DAILY_LOSS_PERCENT:
+            # Check for Daily Goal or Max Loss.
+            # A daily goal of 0 (or less) means DISABLED - a trend system must not
+            # close a runner just because the day is green (see config.py notes).
+            _daily_goal = getattr(config, 'DAILY_GOAL_PERCENT', 0.0) or 0.0
+            _goal_hit = _daily_goal > 0 and daily_pnl_pct >= _daily_goal
+            if _goal_hit or daily_pnl_pct <= -config.MAX_DAILY_LOSS_PERCENT:
                 if not daily_limit_reached:
                     logger.info(f"FUNDED GUARDIAN: Daily Target/Loss Hit ({daily_pnl_pct:.2f}%). Halting until tomorrow.")
                     close_all_trades(order_manager, config.MAGIC_NUMBER)
@@ -623,9 +630,12 @@ def main():
                         logger.info(f"[{symbol}] STATUS | News Buffer Active")
                         continue
 
-                    data_ltf = data_fetcher.get_historical_data(symbol, mt5.TIMEFRAME_M5, 100)
-                    data_htf = data_fetcher.get_historical_data(symbol, mt5.TIMEFRAME_H1, 100)
-                    data_struct = data_fetcher.get_historical_data(symbol, mt5.TIMEFRAME_H4, 100)
+                    # 300 bars: enough for a 200-bar regime average plus a 55-bar
+                    # breakout window. (100 bars made any 200-period MA permanently
+                    # NaN, which silently disabled whole strategies.)
+                    data_ltf = data_fetcher.get_historical_data(symbol, mt5.TIMEFRAME_M5, 200)
+                    data_htf = data_fetcher.get_historical_data(symbol, mt5.TIMEFRAME_H1, 300)
+                    data_struct = data_fetcher.get_historical_data(symbol, mt5.TIMEFRAME_H4, 300)
 
                     if data_ltf is None or data_htf is None: continue
 
@@ -635,8 +645,23 @@ def main():
                     if signal_res['signal'] != 'HOLD':
                         # --- EXECUTION LOGIC ---
                         strategy_used = signal_res.get('strategy', 'Unknown')
-                        # Use .get() without default so None triggers execute_trade's fallback to tick.ask/bid
+                        # Strategies may declare filters that provably hurt them (each
+                        # bypass is documented where the signal is generated).
+                        bypass = set(signal_res.get('bypass_filters', []))
+                        # Some strategies return an explicit limit entry, most do not.
+                        # CRASH FIX: entry_price used to stay None and was then used in
+                        # arithmetic below (abs(None - sl) -> TypeError), which would
+                        # kill the bot the first time SilverBullet or RajaBanks fired.
+                        # Falling back to the live tick here is exactly the price
+                        # execute_trade() would have used anyway.
                         entry_price = signal_res.get('entry_price')
+                        if entry_price is None:
+                            _tick_entry = symbol_cache.get_tick(symbol)
+                            if _tick_entry is None:
+                                logger.warning(f"[{symbol}] No tick available - skipping signal.")
+                                continue
+                            entry_price = (_tick_entry.ask if 'BUY' in signal_res['signal']
+                                           else _tick_entry.bid)
                         
                         # Check strategy performance (Expectancy-Based)
                         strat_perf = performance_tracker.get_strategy_metrics(strategy_used)
@@ -664,13 +689,13 @@ def main():
                                     continue
 
                         # Sentiment Guard (Institutional Wind)
-                        if not sentiment_manager.is_aligned(symbol, signal_res['signal']):
+                        if 'sentiment' not in bypass and not sentiment_manager.is_aligned(symbol, signal_res['signal']):
                             logger.info(f"[{symbol}] Signal {signal_res['signal']} blocked by Macro Sentiment (DXY Conflict)")
                             continue
 
                         # H4 Bias Filter (Trend Alignment)
                         h4_data = symbol_cache.get_rates(symbol, mt5.TIMEFRAME_H4, 2)
-                        if h4_data is not None and len(h4_data) >= 2:
+                        if 'h4_bias' not in bypass and h4_data is not None and len(h4_data) >= 2:
                             last_h4 = h4_data.iloc[-1]
                             h4_bias = "BULLISH" if last_h4['close'] > last_h4['open'] else "BEARISH"
                             if (signal_res['signal'] == 'BUY' and h4_bias != "BULLISH") or \
@@ -679,18 +704,40 @@ def main():
                                 continue
                         
                         # Exhaustion Wick Guard (Institutional Rejection)
-                        if PriceAction.is_exhaustion_candle(data_ltf.iloc[-1], signal_res['signal']):
+                        if 'exhaustion' not in bypass and PriceAction.is_exhaustion_candle(data_ltf.iloc[-1], signal_res['signal']):
                             logger.info(f"[{symbol}] Signal {signal_res['signal']} blocked: Exhaustion Wick detected (Fading Momentum).")
                             continue
 
-                        # RR Filter Check
+                        # RR Filter Check (skipped for strategies with no fixed target -
+                        # a trend system's reward is unknown by construction)
                         risk_pips = abs(entry_price - signal_res['sl'])
                         reward_pips = abs(signal_res['tp'] - entry_price)
                         rr = reward_pips / risk_pips if risk_pips > 0 else 0
                         
-                        if rr < getattr(config, 'MINIMUM_RR_THRESHOLD', 1.0):
+                        if 'rr' not in bypass and rr < getattr(config, 'MINIMUM_RR_THRESHOLD', 1.0):
                             logger.info(f"[{symbol}] Skipping trade - Poor RR: {rr:.2f} (Min: {config.MINIMUM_RR_THRESHOLD})")
                             continue
+
+                        # --- COST-TO-RISK GUARD -------------------------------------
+                        # A 25-point gold spread is $0.25 of guaranteed loss per trade.
+                        # If that is more than MAX_COST_RATIO_OF_R of 1R, the setup
+                        # cannot pay for itself no matter how good the signal is.
+                        tick_for_cost = symbol_cache.get_tick(symbol)
+                        if tick_for_cost:
+                            spread_price = abs(tick_for_cost.ask - tick_for_cost.bid)
+                            _sym_info = symbol_cache.get_info(symbol)
+                            _contract = getattr(_sym_info, "trade_contract_size", 0) or 100.0
+                            # commission is charged per lot: convert it into price terms
+                            commission_price = 7.0 / _contract
+                            risk_price = abs(entry_price - signal_res['sl'])
+                            cost_ratio = (spread_price + commission_price) / risk_price if risk_price > 0 else 1.0
+                            max_ratio = getattr(config, 'MAX_COST_RATIO_OF_R', 0.12)
+                            if max_ratio > 0 and cost_ratio > max_ratio:
+                                logger.info(
+                                    f"[{symbol}] Entry blocked: cost is {cost_ratio:.1%} of 1R "
+                                    f"(limit {max_ratio:.0%}). Stop too tight for the spread."
+                                )
+                                continue
 
                         # Calculate lot size with House Money protection
                         risk_manager.day_start_equity = day_start_equity
@@ -728,7 +775,7 @@ def main():
 
                             # --- SFP REJECTION GUARD (Liquidity Sweep) ---
                             # Block if we just swept a significant high/low and rejected
-                            if PriceAction.is_liquidity_sweep_rejection(symbol_cache.get_data(symbol, mt5.TIMEFRAME_M5), signal_res['signal']):
+                            if 'sfp' not in bypass and PriceAction.is_liquidity_sweep_rejection(symbol_cache.get_data(symbol, mt5.TIMEFRAME_M5), signal_res['signal']):
                                 logger.info(f"[{symbol}] SFP GUARD: Liquidity sweep detected in opposite direction. Signal rejected.")
                                 continue
 
@@ -741,6 +788,10 @@ def main():
                             if trade_res and hasattr(trade_res, 'retcode') and trade_res.retcode == mt5.TRADE_RETCODE_DONE:
                                 logger.info(f"[{symbol}] TRADE EXECUTED | Order: {trade_res.order} | Price: {trade_res.price}")
                                 order_manager.add_trade(trade_res.order, signal_res['sl'], signal_res['tp'], strategy_used)
+                                # Remember this strategy's management plan (trail speed,
+                                # partial TP policy) so live exits match the backtest.
+                                if signal_res.get('manage'):
+                                    trade_manager.set_plan(trade_res.order, strategy_used, signal_res['manage'])
                                 daily_trade_count += 1
                                 trading_days.add(current_time_utc.strftime("%Y-%m-%d"))
                                 if symbol in failed_executions: del failed_executions[symbol]

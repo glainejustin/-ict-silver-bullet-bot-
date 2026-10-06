@@ -1,3 +1,14 @@
+> ⚠️ **CORRECTION (2026-10-06):** the "CHALLENGE PASSED +8.23%" result quoted below came from
+> the in-repo backtester, which does **not** charge the spread on entry, uses look-ahead-prone
+> bar handling in places, and evaluates the strategies on the wrong session clock (see
+> [XAUUSD_EDGE_REPORT.md](XAUUSD_EDGE_REPORT.md) §2). When the same strategy families are
+> re-tested on 1.16M M1 bars of real XAUUSD data with realistic costs **and** a matched
+> random-entry null model, they measure **−0.27R per trade over 27,135 trades**.
+>
+> The only strategy in this repo with a positive out-of-sample expectancy is
+> `strategies/gold_trend.py` (see §3 of the report). Everything below is retained as a
+> record of the original design intent, not as evidence of profitability.
+
 # ICT Silver Bullet Bot: Institutional Hardening Report
 
 This document summarizes the upgrades made to transform the ICT bot into a professional-grade quantitative system capable of passing $5k-$100k funded challenges.

@@ -11,10 +11,9 @@ class RajaBanksStrategy(Strategy):
         self.end_t = datetime.strptime(config.RAJA_SESSION_END, "%H:%M").time()
 
     def generate_signal(self, data_ltf, data_htf, data_struct, current_time):
-        if current_time.tzinfo is None:
-            import pytz
-            current_time = pytz.UTC.localize(current_time)
-        london_time = current_time.astimezone(config.LONDON_TIMEZONE)
+        # BUG FIX: naive timestamps are BROKER time, not UTC (see core/time_utils).
+        from core.time_utils import session_time
+        london_time = session_time(current_time, config.LONDON_TIMEZONE)
         t = london_time.time()
         if not (self.start_t <= t <= self.end_t): return {'signal': 'HOLD', 'reason': "Outside Session"}
         levels = PriceAction.find_high_quality_levels(data_struct, lookback=50, touches=3)
