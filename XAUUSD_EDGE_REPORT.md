@@ -368,14 +368,25 @@ If you cannot sit through that, the system will still fail — not because the e
 
 ### 4.4 A stop rule, so the decision is not made in the moment
 
-Over the 21-year shipping run the rolling **20-trade expectancy** had a median of
-+0.184R and a 5th percentile of −0.252R:
+The stop rule is now code (`core/trade_ledger.py` + `core/health_monitor.py`), and
+its window was chosen by measuring both directions on the 21-year, 338-trade run:
 
-| Rolling 20-trade expectancy | Frequency when the system was working | Read |
+| Window / threshold | Fires in the real 21-year run | Fires on random draws of the same distribution |
 |---|---|---|
-| ≤ −0.20R | 10.7% of windows | normal bad run |
-| **≤ −0.30R** | **2.5% (8 of 319)** | **stop and investigate** |
-| ≤ −0.40R | 0.9% | almost certainly broken or decayed |
+| 20 trades / −0.30R | 8 of 319 windows (2.5%) | 8.2% — rejected as too twitchy |
+| **30 trades / −0.30R (shipped)** | **0 of 309** | **3.8%** |
+| 40 trades / −0.30R | 0 of 299 | 1.8% |
+
+A 20-trade window matched the research statistic but fires on 8.2% of random
+20-trade stretches from this system's own distribution — about a 1-in-12 chance of
+halting a working edge. The shipped 30-trade window never fired in 21 years of
+real trading while still firing 3.8% of the time by chance, which is the margin
+you want from a stop rule: silence when nothing has changed, a signal when
+something has.
+
+Being at 1.3 trades/month, 30 trades is ~2 years — deliberately slow. Fast
+protection is the account-level guardian (4% daily loss, 5% trailing drawdown);
+this guard catches a slow bleed that never trips those.
 
 Decide this now, in writing, while you are not losing money.
 
@@ -409,6 +420,9 @@ What to do with the results — and what not to do — is in
 | `research/map_validation.py` | do market-map levels beat distance-matched controls? |
 | `research/map_filter_test.py` | do map context filters improve the trend system's P&L, against a permutation null? |
 | `research/breadth_test.py` | same logic on 4 FX pairs: is the edge gold-specific, and do the trades diversify? |
+| `core/trade_ledger.py` | R-denominated trade log (risk captured at entry, reconciled on close) |
+| `core/health_monitor.py` | silence alert + edge-decay halt, calibrated from the 21-year rolling-expectancy distribution |
+| `tools/export_mt5_history.py` | export your broker's own history into the research layout |
 | `core/market_map.py` | volume profile, liquidity pools, depth heatmap |
 | `tools/market_map_report.py` | renders the market map (history or live MT5) |
 | `docs/MARKET_MAPS.md` | what the maps are worth, measured |
@@ -425,6 +439,8 @@ Strategy and execution changes: `strategies/gold_trend.py`, `config.py`, `main.p
 4. **No slippage on gaps.** Weekend/news gaps can fill stops far beyond the stop level; the model charges 2 points per side, which is optimistic around news.
 5. **Live results will differ.** Spreads widen, swaps accrue on multi-day positions (I did not model swap/carry — on a long gold position that is normally a small cost), and slippage on H4 breakouts at the London/NY open is real.
 6. **The edge is small and can decay.** +0.2R per trade is a real but thin edge. It survived 21 years, 4 re-selected parameter sets and a full-market-cycle test — that is evidence, not a guarantee.
+6b. **The live guards are calibrated, not validated.** The silence threshold (60 days) and the edge-decay stop line (−0.30R) come from the distribution of a 21-year backtest, and both have been unit-tested against synthetic trade histories — but neither has run against a real broker feed. They are conservative by construction: they block new entries and alert, they never touch open positions. Watch them during demo-forward.
+
 7. **This is not financial advice.** Do not deploy anything here with money you cannot afford to lose. Run it on demo for at least 1-2 months, verify the trade log matches the expected behaviour (1-2 trades/month, H4 breakouts only), and start at 0.25-0.5% risk when you do go live.
 
 ---

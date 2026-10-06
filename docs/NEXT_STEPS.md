@@ -58,18 +58,43 @@ H4 breakouts only, no intraday entries, no entries on gold when price is below
 the 200-bar average. If you see 20 trades in a month, something is misconfigured
 and the research numbers do not describe what you are running.
 
-**b. Falsification rule, decided now rather than in the moment.** Over 21 years
-of *good* history, the rolling **20-trade expectancy** had a median of +0.184R
-and a 5th percentile of −0.252R. A reasonable stop rule:
+**b. Falsification rule — now implemented, not just written down.**
+`core/trade_ledger.py` records every trade in **R** (the risk taken is captured at
+entry, before it can be forgotten), and `core/health_monitor.py` applies the rule
+below live.
 
-| Rolling 20-trade expectancy | Frequency in 21 years | What it means |
+The window and threshold were chosen by measuring both failure directions on the
+21-year, 338-trade run — how often the rule fires on a *working* system versus how
+readily it would fire on an altered one:
+
+| Window / threshold | Fires in the real 21-year run | Fires on random draws of the same distribution |
 |---|---|---|
-| ≤ −0.20R | 10.7% of windows | normal bad run, keep going |
-| **≤ −0.30R** | **2.5% of windows** | **stop, investigate — this is rare in a working system** |
-| ≤ −0.40R | 0.9% of windows | stop; almost certainly broken or decayed |
+| 20 trades / −0.30R | 8 of 319 windows (2.5%) | **8.2% — too twitchy, rejected** |
+| 20 trades / −0.40R | 3 of 319 (0.9%) | 3.7% |
+| **30 trades / −0.30R (shipped)** | **0 of 309 — never** | **3.8%** |
+| 30 trades / −0.40R | 0 of 309 | 1.4% |
+| 40 trades / −0.30R | 0 of 299 | 1.8% |
 
-That is 8 occurrences in 319 windows. If it fires live, assume something real
-changed before assuming it is variance.
+A 20-trade window was the first choice — it matched the research's rolling
+statistic — but it fires on **8.2%** of random 20-trade stretches drawn from the
+validated system's own outcome distribution. That is roughly a 1-in-12 chance of
+halting a working edge, which is too high a price for reacting sooner. The
+shipped 30/ −0.30R combination never fired across 309 windows in 21 years of the
+real sequence, while still firing 3.8% of the time by chance — i.e. it is a
+genuine change signal rather than ordinary variance.
+
+Note the guard is deliberately **slow**: at 1.3 trades/month, 30 trades is about
+two years. Fast protection is the account-level guardian (4% daily loss, 5%
+trailing drawdown); this one exists to catch a slow bleed that never trips those.
+
+**How it behaves in the bot:** the halt stops **new entries only** — open
+positions keep their stops and their management plan. It is announced once by
+Telegram and persisted to `logs/health_state.json`, so a restart cannot quietly
+forget it. Clearing it is deliberately manual (`clear_halt()` or delete the state
+file), and after a clear the rolling window **restarts from that moment** rather
+than re-halting on the same stale trades — without that, a cleared halt would
+re-trigger instantly on the same trades and the bot could never resume. The same
+module raises the silence alert from §7, and warns when the ledger is *empty*.
 
 ---
 
@@ -80,9 +105,19 @@ on a public 21-year M15 export; the FX breadth test ran on 3.4 years because
 that is what was reachable. Your terminal can export decades of M1 for every
 symbol your broker offers — indices, energies, rates, crypto, other FX crosses.
 
-`tools/export_mt5_history.py` (to be written) would dump them to parquet in the
-same layout the harness reads, and then every question below becomes testable in
-the same afternoon. **This is the highest-leverage single action available.**
+`tools/export_mt5_history.py` now does this:
+
+```bash
+python tools/export_mt5_history.py --list                       # what your broker offers
+python tools/export_mt5_history.py --symbols XAUUSD,GBPUSD,US500 \
+    --timeframes M1,M5,H1,H4 --start 2003-01-01
+```
+
+It writes `research/data/mt5/<SYMBOL>_<TF>.parquet` in the layout the harness
+reads, requests history in one-year chunks (a single wide request is silently
+truncated by most brokers, which looks like "history starts in 2019"), and stores
+**both** the broker clock and true UTC — the broker/UTC confusion was a real bug
+in this repo's strategies. **This is the highest-leverage single action available.**
 
 ---
 
@@ -134,23 +169,25 @@ find a better Donchian length on the data you already have.
 
 ## 7. Operational hygiene before any live money
 
-- [ ] **Kill switch exists and is reachable.** The 20-trade rule from §3 is the
-      trade-based one; the account-level one is the risk guardian's trailing
-      drawdown. Know where both are.
-- [ ] **Keep `LEGACY_STRATEGIES_ENABLED = False`.** Those four strategies
-      measured −0.15R to −0.39R per trade. They are in the repo for study only.
-- [ ] **Risk at 0.5-0.75%.** Not 2%, not "just for the first trade".
+- [x] **Kill switch exists and is reachable.** The 20-trade rule from §3 is now
+      `core/health_monitor.py` (trade-based, automated); the account-level one is
+      the risk guardian's trailing drawdown. Both are live.
+- [x] **`LEGACY_STRATEGIES_ENABLED = False`.** Those four strategies measured
+      −0.15R to −0.39R per trade. They are in the repo for study only.
+- [x] **Risk at 0.75%** in `config.py`. Not 2%, not "just for the first trade".
 - [ ] **Verify the cost guard is live.** With a 25-point gold spread, a setup
-      whose stop is under ~400 points is refused — check the log line appears
-      rather than assuming it.
-- [ ] **Alerts on silence.** Given this system should trade ~1.3 times a month,
-      add a "no signal in 60 days" alert — a silently-broken indicator (200-bar
-      MA over 100 fetched bars) is exactly the failure this repo has already hit
-      once, and it produces no error, just nothing.
+      whose stop is under ~400 points is refused. Look for the block line in the
+      log during demo-forward rather than assuming it.
+- [x] **Alerts on silence.** Implemented: `SILENCE_ALERT_DAYS = 60`, repeating at
+      most every 30 days (`SILENCE_ALERT_REPEAT_DAYS`). It also warns when the
+      ledger is *empty*, which is the "silently disabled strategy" case — a
+      200-bar MA over 100 fetched bars is exactly that failure, and this repo has
+      already shipped it once.
 - [ ] **VPS with a stable connection.** MT5 has to stay up for a system that can
       wait weeks for a signal.
-- [ ] **Keep the trade log.** Every fill, with the strategy reason string. The
-      log is what lets you tell "the edge decayed" from "the bot broke".
+- [x] **Keep the trade log.** `logs/trade_ledger.jsonl` — every fill with its
+      strategy, entry, stop and R, reconciled against broker history. This is what
+      lets you tell "the edge decayed" from "the bot broke".
 
 ---
 

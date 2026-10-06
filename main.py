@@ -24,6 +24,8 @@ from core.performance_tracker import PerformanceTracker
 from core.sentiment_manager import SentimentManager
 from core.symbol_cache import SymbolInfoCache
 from core.time_utils import get_mt5_time_utc
+from core.trade_ledger import TradeLedger
+from core.health_monitor import HealthMonitor
 
 # Strategies
 from strategies.raja_banks import RajaBanksStrategy
@@ -153,6 +155,8 @@ def main():
     bot_start_date = get_mt5_time_utc()
     bot_paused = False
     daily_limit_reached = False
+    last_health_reconcile = 0.0
+    health_halt_announced = False
     daily_trade_count = 0
     last_reset_day = bot_start_date.date()
 
@@ -241,6 +245,35 @@ def main():
         logger.warning(f"Soft Recovery Mode Active! Previous day PnL: ${last_day_pnl:.2f}. Risk halved.")
     order_manager = OrderManager(magic_number=config.MAGIC_NUMBER)
     trade_manager = TradeManager(magic_number=config.MAGIC_NUMBER, initial_risks=initial_risks_stored, partial_done=partial_done, breakeven_done=breakeven_done)
+
+    # --- operational health monitors ------------------------------------
+    # Record every trade in R and act on two things a live log cannot show:
+    # a strategy that has silently stopped signalling, and an edge that has
+    # decayed (see the calibration in config.py). If either object fails to
+    # initialise we log loudly and trade on: the system's own stop/target
+    # logic still protects the account, and refusing to start would be worse.
+    try:
+        trade_ledger = TradeLedger(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         getattr(config, 'TRADE_LEDGER_PATH', 'logs/trade_ledger.jsonl')),
+            magic=config.MAGIC_NUMBER,
+        )
+        health_monitor = HealthMonitor(
+            trade_ledger,
+            enabled=bool(getattr(config, 'HEALTH_MONITOR_ENABLED', True)),
+            silence_days_limit=float(getattr(config, 'SILENCE_ALERT_DAYS', 60)),
+            edge_window=int(getattr(config, 'EDGE_STOP_TRADES', 20)),
+            edge_threshold_r=float(getattr(config, 'EDGE_STOP_EXPECTANCY_R', -0.30)),
+            state_path=os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    getattr(config, 'HEALTH_STATE_PATH', 'logs/health_state.json')),
+            silence_alert_repeat_days=float(getattr(config, 'SILENCE_ALERT_REPEAT_DAYS', 30)),
+        )
+        logger.info(f"Health monitors active | {health_monitor.status_line()}")
+    except Exception as e:
+        health_monitor = None
+        trade_ledger = None
+        logger.error(f"Health monitors DISABLED ({type(e).__name__}: {e}). "
+                     f"Silence/edge-decay alerts will NOT fire.")
     news_manager = NewsManager()
     sentiment_manager = SentimentManager()
     performance_tracker = PerformanceTracker(magic_number=config.MAGIC_NUMBER, challenge_start_date=challenge_start_date)
@@ -585,7 +618,42 @@ def main():
                 logger.info(f"Daily trade limit ({config.MAX_DAILY_TRADES}) reached - halting new entries.")
                 daily_limit_reached = True
 
-            if not bot_paused and not daily_limit_reached and new_candle_ready:
+            # --- health monitors --------------------------------------------
+            health_blocked, health_reason = (False, "")
+            if health_monitor is not None:
+                # cheap, in-memory: does the rolling edge say stop?
+                health_blocked, health_reason = health_monitor.should_block_entries()
+                if health_blocked and not health_halt_announced:
+                    logger.error(f"HEALTH HALT: {health_reason}")
+                    alert_manager.send_message(
+                        f"🛑 <b>NEW ENTRIES HALTED</b>\n"
+                        f"━━━━━━━━━━━━━━\n"
+                        f"{health_reason}\n\n"
+                        f"Open positions keep their stops and targets.\n"
+                        f"Check the trade log, then clear the halt manually:\n"
+                        f"delete logs/health_state.json or call clear_halt()."
+                    )
+                    health_halt_announced = True
+                elif not health_blocked:
+                    health_halt_announced = False
+
+                # throttled: reconcile the R ledger against broker history and
+                # shout if the bot has gone quiet for too long
+                if time.time() - last_health_reconcile > 300:
+                    last_health_reconcile = time.time()
+                    try:
+                        n_closed = trade_ledger.reconcile(mt5)
+                        if n_closed:
+                            logger.info(f"LEDGER: reconciled {n_closed} closed trade(s) | "
+                                        f"{health_monitor.status_line()}")
+                    except Exception as e:
+                        logger.debug(f"Ledger reconcile skipped: {type(e).__name__}: {e}")
+                    silence_msg = health_monitor.due_silence_alert()
+                    if silence_msg:
+                        logger.warning(silence_msg.replace("<b>", "").replace("</b>", ""))
+                        alert_manager.send_message(silence_msg)
+
+            if not bot_paused and not daily_limit_reached and not health_blocked and new_candle_ready:
                 active_positions = mt5.positions_get(magic=config.MAGIC_NUMBER)
                 pending_orders = mt5.orders_get(magic=config.MAGIC_NUMBER)
                 
@@ -792,6 +860,25 @@ def main():
                                 # partial TP policy) so live exits match the backtest.
                                 if signal_res.get('manage'):
                                     trade_manager.set_plan(trade_res.order, strategy_used, signal_res['manage'])
+                                # Record the trade in R at entry: the risk taken is
+                                # known NOW (lot size x stop distance), which is the
+                                # only reliable way to compute R at exit.
+                                if trade_ledger is not None:
+                                    try:
+                                        _info = symbol_cache.get_info(symbol)
+                                        _contract = getattr(_info, 'trade_contract_size', 0) or 100.0
+                                        _risk_price = abs(float(entry_price) - float(signal_res['sl']))
+                                        trade_ledger.record_open(
+                                            ticket=getattr(trade_res, 'order', 0),
+                                            symbol=symbol, strategy=strategy_used,
+                                            entry=float(trade_res.price or entry_price),
+                                            sl=float(signal_res['sl']), lots=float(lot_size),
+                                            risk_cash=_risk_price * _contract * float(lot_size),
+                                            deal=getattr(trade_res, 'deal', None),
+                                        )
+                                    except Exception as e:
+                                        logger.warning(f"Ledger write failed for {symbol}: "
+                                                       f"{type(e).__name__}: {e}")
                                 daily_trade_count += 1
                                 trading_days.add(current_time_utc.strftime("%Y-%m-%d"))
                                 if symbol in failed_executions: del failed_executions[symbol]

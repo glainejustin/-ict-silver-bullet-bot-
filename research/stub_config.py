@@ -27,6 +27,13 @@ def install() -> None:
     m.GOLD_TREND_ATR_PERIOD = 14
     m.GOLD_TREND_STOP_ATR = 2.0
     m.GOLD_TREND_TRAIL_ATR = 4.0
+    m.HEALTH_MONITOR_ENABLED = True
+    m.SILENCE_ALERT_DAYS = 60
+    m.SILENCE_ALERT_REPEAT_DAYS = 30
+    m.EDGE_STOP_TRADES = 30
+    m.EDGE_STOP_EXPECTANCY_R = -0.30
+    m.TRADE_LEDGER_PATH = "logs/trade_ledger.jsonl"
+    m.HEALTH_STATE_PATH = "logs/health_state.json"
     m.GOLD_TREND_REGIME_FILTER = True
     m.GOLD_TREND_ALLOW_SHORTS = False
     m.GOLD_TREND_REQUIRE_NEW_BAR = True

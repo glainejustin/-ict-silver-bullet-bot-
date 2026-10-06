@@ -44,6 +44,14 @@ Every strategy in this repo was tested against **1,162,584 M1 bars (2023-2026) a
 
 **Enabled by default:** `GoldTrendStrategy` on XAUUSD only. Walk-forward validated (parameters chosen on prior 4 years, traded untouched): **+30.3% over 17 out-of-sample years, 12/17 positive, worst year −3.8%, worst drawdown −4.8%** at 0.5% risk — 338 trades over 21.3 years, **+0.260R per trade**, profit factor 1.54. It trades ~1.3 times a **month**.
 
+**Safety net:** two guards now run live (`core/health_monitor.py`) — a *silence*
+alert if no trade has been taken for 60 days, and an *edge-decay* halt that stops
+new entries if the rolling 30-trade expectancy falls to −0.30R or below — a level
+the 21-year validated run never reached in 309 windows, while random draws of the
+same distribution reach it 3.8% of the time. It is a signal that something
+changed, not a normal bad run. Neither
+guard touches open positions.
+
 **Honest expectation:** with a genuine edge of +0.2R/trade and ~27 trades/year, this compounds to single-digit annual percentages with small drawdowns — *not* 8% in 30 days. An 8%/30-day funded challenge with this edge has a 3-15% pass rate ([research/challenge_sim.py](research/challenge_sim.py)). Anything promising more is selling you variance.
 
 **Reproduce it yourself:** `python research/run_all.py`
@@ -186,6 +194,9 @@ ict_silver_bullet_bot/
 │   ├── check_config_parity.py  # guards research config vs shipped config
 │   └── run_all.py              # one command to reproduce the whole study
 │
+├── core/health_monitor.py      # silence + edge-decay guards (halts new entries)
+├── core/trade_ledger.py        # R-denominated trade log
+├── tools/export_mt5_history.py # pull your own MT5 history into the research layout
 ├── core/market_map.py          # volume profile, liquidity pools, depth heatmap
 ├── tools/market_map_report.py  # renders the market map (history or live MT5)
 ├── docs/MARKET_MAPS.md         # what the maps are worth, measured
@@ -340,6 +351,9 @@ python research/check_config_parity.py  # fails if research config drifts from c
 python research/challenge_sim.py        # prop-challenge pass/fail probabilities
 python research/map_filter_test.py      # do market-map filters help? (permutation null)
 python research/breadth_test.py         # does it work on FX too? (diversification test)
+
+python tests/test_health_monitor.py     # the live guards: R ledger, halt, silence
+python tools/export_mt5_history.py --list   # export your broker's history (Windows/MT5)
 ```
 
 ### Market maps (volume profile / liquidity / depth)

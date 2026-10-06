@@ -169,8 +169,9 @@ LONDON_TIMEZONE = pytz.timezone('Europe/London')
 # ----------------------------------------------------------------------------
 #  Donchian breakout on H4 with an ATR trailing stop, long-only.
 #  Evidence (see XAUUSD_EDGE_REPORT.md and research/out/):
-#    * 21-year walk-forward, params picked on prior 4y only:
-#      +27.1% total, 12/17 positive years, worst year -4.1%, worst DD -3.8% @0.5% risk
+#    * 21-year walk-forward, params picked on prior 4y only (ATR(14)):
+#      +30.3% total, 12/17 positive years, worst year -3.8%, worst DD -4.8% @0.5% risk
+#    * full 21.3y sample of this exact config: 338 trades, +0.260R, PF 1.54, DD -5.2%
 #    * live-code replay 2023-2026 @0.75% risk: +33.9%, CAGR 9.0%, max DD -5.4%,
 #      52 trades, profit factor 2.97
 #    * the same rules trading long AND short roughly halved the return
@@ -190,6 +191,39 @@ GOLD_TREND_REGIME_FILTER = True  # Only buy above the long moving average
 GOLD_TREND_REGIME_SMA = 200      # MA length (clamped to available history)
 GOLD_TREND_ALLOW_SHORTS = False  # Shorts roughly halved the 21-year return
 GOLD_TREND_REQUIRE_NEW_BAR = True # One signal per closed bar, no re-firing
+
+# ============================================================================
+#  OPERATIONAL HEALTH MONITORS  (core/health_monitor.py, core/trade_ledger.py)
+# ----------------------------------------------------------------------------
+#  Two failures are invisible in a live log: a strategy that has silently
+#  stopped producing signals, and an edge that has decayed. Both are measured
+#  from a ledger of closed trades in R (multiples of the risk taken), the same
+#  unit the 21-year research used.
+#
+#  Calibration, measured two ways on the 21-year, 338-trade shipping run:
+#    * a 20-trade window breaches -0.30R in 2.5% of windows (8 of 319), but
+#      drawing 20-trade stretches at random from the same outcome distribution
+#      breaches it 8.2% of the time -- too twitchy for a stop rule;
+#    * a 30-trade window NEVER breached -0.30R in the real sequence (0 of 309),
+#      while random draws of the same size breach it 3.6% of the time. That is
+#      the margin wanted: silence on a working system, a signal when something
+#      has genuinely changed.
+#    * mean gap between entries ~23 days, so 60 days of silence is ~2.6x normal
+#  Note the edge guard is deliberately SLOW: at 1.3 trades/month, 30 trades is
+#  ~2 years. Fast protection is the account-level guardian (daily loss / trailing
+#  drawdown); this one catches a slow bleed that never trips those.
+#
+#  A halt stops NEW entries only -- open trades keep their stops and their
+#  management plan. Clearing a halt is deliberately manual: review the logs
+#  first, then call health_monitor.clear_halt() or delete logs/health_state.json.
+# ============================================================================
+HEALTH_MONITOR_ENABLED = True
+SILENCE_ALERT_DAYS = 60          # alert when no entry has been taken for this long
+SILENCE_ALERT_REPEAT_DAYS = 30   # minimum gap between repeats of that alert
+EDGE_STOP_TRADES = 30            # rolling window of closed trades (see calibration)
+EDGE_STOP_EXPECTANCY_R = -0.30   # halt new entries at/below this rolling expectancy
+TRADE_LEDGER_PATH = "logs/trade_ledger.jsonl"
+HEALTH_STATE_PATH = "logs/health_state.json"
 
 # --- Cost awareness (why most retail gold bots lose) ---
 # A 25-point gold spread costs $0.25 round trip. If your stop is 1R = $5 then

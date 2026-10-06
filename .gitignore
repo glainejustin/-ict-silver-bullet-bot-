@@ -59,3 +59,5 @@ Desktop.ini
 
 # === Misc ===
 .python-version
+# runtime state: trade ledger + health monitor state
+logs/

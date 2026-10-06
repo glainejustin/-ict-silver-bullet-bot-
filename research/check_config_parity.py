@@ -32,6 +32,11 @@ KEYS = [
     "MAX_COST_RATIO_OF_R", "MAX_DAILY_TRADES", "DAILY_GOAL_PERCENT",
     "SYMBOLS", "MAX_SPREAD_PIPS", "SYMBOL_PIP_SIZE", "VOL_MA_PERIOD",
     "PARTIAL_TP_RR", "BREAKEVEN_RR",
+    # operational monitors: a halt threshold that drifts between the shipped
+    # config and the research would invalidate the calibration behind it
+    "HEALTH_MONITOR_ENABLED", "SILENCE_ALERT_DAYS", "SILENCE_ALERT_REPEAT_DAYS",
+    "EDGE_STOP_TRADES", "EDGE_STOP_EXPECTANCY_R", "TRADE_LEDGER_PATH",
+    "HEALTH_STATE_PATH",
 ]
 
 
