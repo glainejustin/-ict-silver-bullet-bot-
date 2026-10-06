@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="{{ url_for('index') }}">&larr; back to pipeline</a>
+<h1>Add a lead manually</h1>
+<p>Use this for anything that doesn't come through a connector yet — a tip from
+a contact, something you saw in a local Facebook group, a council list entry, etc.</p>
+
+<form method="post" class="buyer-form">
+  <input name="address" placeholder="Address" required style="flex-basis: 100%;">
+  <input name="postcode" placeholder="Postcode" required>
+  <select name="property_type">
+    <option value="terraced">Terraced</option>
+    <option value="semi">Semi-detached</option>
+    <option value="detached">Detached</option>
+    <option value="flat">Flat</option>
+    <option value="other">Other</option>
+  </select>
+  <input name="bedrooms" placeholder="Bedrooms" type="number">
+  <input name="asking_price" placeholder="Asking price (£)" type="number">
+  <input name="motivation_signal" placeholder="Why is this a lead? (e.g. probate, relocation)" style="flex-basis: 100%;">
+  <button type="submit">Add lead</button>
+</form>
+{% endblock %}

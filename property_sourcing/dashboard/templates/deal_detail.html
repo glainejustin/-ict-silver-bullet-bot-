@@ -5,6 +5,13 @@
 <h1>{{ lead.address or lead.postcode }}</h1>
 <p class="badge">{{ lead.status }}</p>
 
+<section class="actions">
+  <form method="post" action="{{ url_for('analyze_lead_now', lead_id=lead.id) }}" style="display:inline">
+    <button type="submit">Re-run valuation &amp; analysis</button>
+  </form>
+  <a href="{{ url_for('deal_pack_pdf', lead_id=lead.id) }}"><button type="button" class="secondary">Download deal pack (PDF)</button></a>
+</section>
+
 <section class="grid">
   <div><strong>Source</strong><br>{{ lead.source }} ({{ lead.motivation_signal or 'n/a' }})</div>
   <div><strong>Postcode</strong><br>{{ lead.postcode or '—' }}</div>

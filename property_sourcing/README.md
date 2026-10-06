@@ -1,5 +1,15 @@
 # Property Sourcing Autopilot 🏠🤖
 
+> 🚧 **Status: build-now, launch-later project.** If your current UK
+> immigration status doesn't permit self-employment/running a business (e.g.
+> a Skilled Worker visa), this is being developed and tested purely as a
+> personal software project against demo data — not operated as a live
+> business — until that changes. See
+> [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md) for exactly what to
+> do (legally and technically) the day it can go live. This is not legal or
+> immigration advice — confirm your situation with an OISC-registered
+> adviser or immigration solicitor.
+
 An automated, AI-agent-driven engine for running a **UK property deal-sourcing
 business** (find below-market-value deals → package them → match to
 investors → draft outreach → sell the lead for a sourcing fee) with as close
@@ -70,6 +80,14 @@ emails without needing a single API key.
    emails and I'm happy with the quality — then flip it to `false` for fully
    autonomous sending.
 
+## What's in the dashboard
+- **Pipeline view** — every lead, scored and filterable by status.
+- **Add lead manually** — log a tip from a contact or local group without touching a CSV.
+- **Deal detail page** — full valuation breakdown, comps used, outreach history, and a
+  **"Download deal pack (PDF)"** button that generates a client-ready one-pager.
+- **Buyer CRM** — your investor list and matching criteria.
+- **Re-run valuation** on any single lead on demand.
+
 ## Project layout
 
 ```
@@ -84,8 +102,19 @@ run_pipeline.py CLI to run everything once (supports --demo)
 seed/           offline demo data + your buyer CRM starter file
 tests/          automated tests (run `pytest`), including a full offline
                 end-to-end pipeline test
-docs/           legal compliance checklist, architecture notes, getting started
+docs/           legal compliance checklist, launch checklist, deployment guide,
+                architecture notes, getting started
+Dockerfile,
+docker-compose.yml   one-command deployment for when you're ready to go live
 ```
+
+## 📋 Not ready to launch yet?
+
+If you can't legally operate a business right now (for example, a visa that
+doesn't permit self-employment), see
+[`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md) — it's written
+specifically for "keep building and testing now, flip the switch later"
+and lists exactly what changes (legally and technically) the day you can.
 
 ## Why this can't be truly "zero investment or zero involvement"
 

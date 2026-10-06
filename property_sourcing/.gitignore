@@ -2,6 +2,6 @@
 __pycache__/
 *.pyc
 .env
-data/*.db
-data/land_registry_cache/
+data/
 *.sqlite3
+.pytest_cache/

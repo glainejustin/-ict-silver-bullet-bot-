@@ -6,12 +6,13 @@ pipeline, lets you review/send drafted outreach, and manage your buyer CRM.
 """
 import logging
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, redirect, render_template, request, send_file, url_for
 
 import config
 import db
 import pipeline
-from outreach import email_sender
+from agents import comp_finder, deal_analyzer
+from outreach import deal_pack, email_sender
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -45,6 +46,54 @@ def lead_detail(lead_id):
     comps = db.get_comps(lead_id)
     outreach = db.list_outreach(lead_id)
     return render_template("deal_detail.html", lead=lead, comps=comps, outreach=outreach)
+
+
+@app.route("/leads/<int:lead_id>/analyze", methods=["POST"])
+def analyze_lead_now(lead_id):
+    lead = db.get_lead(lead_id)
+    if lead:
+        valuation = comp_finder.find_market_value(lead)
+        analysis = deal_analyzer.analyze(lead, valuation["estimated_market_value"])
+        db.update_lead(lead_id, {**analysis, "status": "analyzed"})
+        if valuation["comps"]:
+            db.add_comps(lead_id, valuation["comps"])
+        db.log_activity(lead_id, "analyzed", "manually triggered from dashboard")
+    return redirect(url_for("lead_detail", lead_id=lead_id))
+
+
+@app.route("/leads/<int:lead_id>/deal-pack.pdf")
+def deal_pack_pdf(lead_id):
+    lead = db.get_lead(lead_id)
+    if not lead:
+        return redirect(url_for("index"))
+    comps = db.get_comps(lead_id)
+    path = deal_pack.build_deal_pack(lead, comps)
+    return send_file(path, as_attachment=True, download_name=f"deal_pack_{lead_id}.pdf")
+
+
+@app.route("/leads/add", methods=["GET", "POST"])
+def add_lead():
+    if request.method == "POST":
+        postcode = request.form.get("postcode", "").strip().upper()
+        from connectors.base import BaseConnector
+
+        lead = {
+            "source": "manual",
+            "source_ref": f"manual-{db.now()}",
+            "address": request.form.get("address"),
+            "postcode": postcode,
+            "outcode": BaseConnector.outcode_of(postcode),
+            "property_type": request.form.get("property_type") or "other",
+            "bedrooms": int(request.form["bedrooms"]) if request.form.get("bedrooms") else None,
+            "asking_price": float(request.form["asking_price"]) if request.form.get("asking_price") else None,
+            "motivation_signal": request.form.get("motivation_signal") or "Manually added lead",
+            "raw_data": {},
+        }
+        lead_id, _ = db.upsert_lead(lead)
+        db.log_activity(lead_id, "ingested", "manually added via dashboard")
+        return redirect(url_for("lead_detail", lead_id=lead_id))
+
+    return render_template("add_lead.html")
 
 
 @app.route("/outreach/<int:outreach_id>/send", methods=["POST"])
