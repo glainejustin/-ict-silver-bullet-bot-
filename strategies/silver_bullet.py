@@ -16,16 +16,23 @@ class SilverBulletStrategy(Strategy):
 
     def is_silver_bullet_hour(self, current_time):
         """
-        Silver Bullet Windows (NY Time):
-        - AM: 10:00 - 11:00 AM
-        - PM: 02:00 - 03:00 PM
-        - London: 03:00 - 04:00 AM
+        TRUE ICT Silver Bullet windows, in New York time:
+          - London Open SB : 03:00 - 04:00 NY
+          - AM SB          : 10:00 - 11:00 NY
+          - PM SB          : 14:00 - 15:00 NY
+
+        BUG FIX: this used to call broker_to_ny(), which assumed its input was
+        broker time. Live, main.py passes TRUE UTC, so every window was evaluated
+        2-3 hours away from the intended session (and the old code returned True
+        for the whole 14:00-14:59 hour rather than using the minute windows).
+        It also silently swallowed any tz-aware input. session_time() handles both
+        clocks correctly.
         """
-        from core.time_utils import broker_to_ny
-        ny_now = broker_to_ny(current_time)
-        hour = ny_now.hour
-        
-        return hour in [3, 10, 14]
+        from core.time_utils import session_time
+        ny_now = session_time(current_time)
+        minutes = ny_now.hour * 60 + ny_now.minute
+        windows = [(3 * 60, 4 * 60), (10 * 60, 11 * 60), (14 * 60, 15 * 60)]
+        return any(lo <= minutes < hi for lo, hi in windows)
 
     def generate_signal(self, data_ltf, data_htf, data_struct, current_time):
         if not self.is_silver_bullet_hour(current_time):

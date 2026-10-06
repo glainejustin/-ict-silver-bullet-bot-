@@ -24,12 +24,15 @@ from core.performance_tracker import PerformanceTracker
 from core.sentiment_manager import SentimentManager
 from core.symbol_cache import SymbolInfoCache
 from core.time_utils import get_mt5_time_utc
+from core.trade_ledger import TradeLedger
+from core.health_monitor import HealthMonitor
 
 # Strategies
 from strategies.raja_banks import RajaBanksStrategy
 from strategies.london_breakout import LondonBreakoutStrategy
 from strategies.silver_bullet import SilverBulletStrategy
 from strategies.pure_price_action import PurePriceActionStrategy
+from strategies.gold_trend import GoldTrendStrategy
 import pytz
 
 # Configuration
@@ -152,6 +155,8 @@ def main():
     bot_start_date = get_mt5_time_utc()
     bot_paused = False
     daily_limit_reached = False
+    last_health_reconcile = 0.0
+    health_halt_announced = False
     daily_trade_count = 0
     last_reset_day = bot_start_date.date()
 
@@ -240,6 +245,35 @@ def main():
         logger.warning(f"Soft Recovery Mode Active! Previous day PnL: ${last_day_pnl:.2f}. Risk halved.")
     order_manager = OrderManager(magic_number=config.MAGIC_NUMBER)
     trade_manager = TradeManager(magic_number=config.MAGIC_NUMBER, initial_risks=initial_risks_stored, partial_done=partial_done, breakeven_done=breakeven_done)
+
+    # --- operational health monitors ------------------------------------
+    # Record every trade in R and act on two things a live log cannot show:
+    # a strategy that has silently stopped signalling, and an edge that has
+    # decayed (see the calibration in config.py). If either object fails to
+    # initialise we log loudly and trade on: the system's own stop/target
+    # logic still protects the account, and refusing to start would be worse.
+    try:
+        trade_ledger = TradeLedger(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         getattr(config, 'TRADE_LEDGER_PATH', 'logs/trade_ledger.jsonl')),
+            magic=config.MAGIC_NUMBER,
+        )
+        health_monitor = HealthMonitor(
+            trade_ledger,
+            enabled=bool(getattr(config, 'HEALTH_MONITOR_ENABLED', True)),
+            silence_days_limit=float(getattr(config, 'SILENCE_ALERT_DAYS', 60)),
+            edge_window=int(getattr(config, 'EDGE_STOP_TRADES', 20)),
+            edge_threshold_r=float(getattr(config, 'EDGE_STOP_EXPECTANCY_R', -0.30)),
+            state_path=os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    getattr(config, 'HEALTH_STATE_PATH', 'logs/health_state.json')),
+            silence_alert_repeat_days=float(getattr(config, 'SILENCE_ALERT_REPEAT_DAYS', 30)),
+        )
+        logger.info(f"Health monitors active | {health_monitor.status_line()}")
+    except Exception as e:
+        health_monitor = None
+        trade_ledger = None
+        logger.error(f"Health monitors DISABLED ({type(e).__name__}: {e}). "
+                     f"Silence/edge-decay alerts will NOT fire.")
     news_manager = NewsManager()
     sentiment_manager = SentimentManager()
     performance_tracker = PerformanceTracker(magic_number=config.MAGIC_NUMBER, challenge_start_date=challenge_start_date)
@@ -268,6 +302,8 @@ def main():
                 strats_for_symbol.append(SilverBulletStrategy(f"Silver_{symbol}", symbol))
             elif s_name == "PurePriceActionStrategy":
                 strats_for_symbol.append(PurePriceActionStrategy(f"PurePA_{symbol}", symbol))
+            elif s_name == "GoldTrendStrategy":
+                strats_for_symbol.append(GoldTrendStrategy(f"GoldTrend_{symbol}", symbol))
             
         if strats_for_symbol:
             aggregator = SignalAggregator(strategies=strats_for_symbol, min_confidence_threshold=1.0)
@@ -410,8 +446,12 @@ def main():
             current_equity = acc_info.equity
             daily_pnl_pct = ((current_equity - day_start_equity) / day_start_equity) * 100 if day_start_equity > 0 else 0
             
-            # Check for Daily Goal or Max Loss
-            if daily_pnl_pct >= getattr(config, 'DAILY_GOAL_PERCENT', getattr(config, 'DAILY_PROFIT_TARGET_PERCENT', 5.0)) or daily_pnl_pct <= -config.MAX_DAILY_LOSS_PERCENT:
+            # Check for Daily Goal or Max Loss.
+            # A daily goal of 0 (or less) means DISABLED - a trend system must not
+            # close a runner just because the day is green (see config.py notes).
+            _daily_goal = getattr(config, 'DAILY_GOAL_PERCENT', 0.0) or 0.0
+            _goal_hit = _daily_goal > 0 and daily_pnl_pct >= _daily_goal
+            if _goal_hit or daily_pnl_pct <= -config.MAX_DAILY_LOSS_PERCENT:
                 if not daily_limit_reached:
                     logger.info(f"FUNDED GUARDIAN: Daily Target/Loss Hit ({daily_pnl_pct:.2f}%). Halting until tomorrow.")
                     close_all_trades(order_manager, config.MAGIC_NUMBER)
@@ -578,7 +618,42 @@ def main():
                 logger.info(f"Daily trade limit ({config.MAX_DAILY_TRADES}) reached - halting new entries.")
                 daily_limit_reached = True
 
-            if not bot_paused and not daily_limit_reached and new_candle_ready:
+            # --- health monitors --------------------------------------------
+            health_blocked, health_reason = (False, "")
+            if health_monitor is not None:
+                # cheap, in-memory: does the rolling edge say stop?
+                health_blocked, health_reason = health_monitor.should_block_entries()
+                if health_blocked and not health_halt_announced:
+                    logger.error(f"HEALTH HALT: {health_reason}")
+                    alert_manager.send_message(
+                        f"🛑 <b>NEW ENTRIES HALTED</b>\n"
+                        f"━━━━━━━━━━━━━━\n"
+                        f"{health_reason}\n\n"
+                        f"Open positions keep their stops and targets.\n"
+                        f"Check the trade log, then clear the halt manually:\n"
+                        f"delete logs/health_state.json or call clear_halt()."
+                    )
+                    health_halt_announced = True
+                elif not health_blocked:
+                    health_halt_announced = False
+
+                # throttled: reconcile the R ledger against broker history and
+                # shout if the bot has gone quiet for too long
+                if time.time() - last_health_reconcile > 300:
+                    last_health_reconcile = time.time()
+                    try:
+                        n_closed = trade_ledger.reconcile(mt5)
+                        if n_closed:
+                            logger.info(f"LEDGER: reconciled {n_closed} closed trade(s) | "
+                                        f"{health_monitor.status_line()}")
+                    except Exception as e:
+                        logger.debug(f"Ledger reconcile skipped: {type(e).__name__}: {e}")
+                    silence_msg = health_monitor.due_silence_alert()
+                    if silence_msg:
+                        logger.warning(silence_msg.replace("<b>", "").replace("</b>", ""))
+                        alert_manager.send_message(silence_msg)
+
+            if not bot_paused and not daily_limit_reached and not health_blocked and new_candle_ready:
                 active_positions = mt5.positions_get(magic=config.MAGIC_NUMBER)
                 pending_orders = mt5.orders_get(magic=config.MAGIC_NUMBER)
                 
@@ -623,9 +698,12 @@ def main():
                         logger.info(f"[{symbol}] STATUS | News Buffer Active")
                         continue
 
-                    data_ltf = data_fetcher.get_historical_data(symbol, mt5.TIMEFRAME_M5, 100)
-                    data_htf = data_fetcher.get_historical_data(symbol, mt5.TIMEFRAME_H1, 100)
-                    data_struct = data_fetcher.get_historical_data(symbol, mt5.TIMEFRAME_H4, 100)
+                    # 300 bars: enough for a 200-bar regime average plus a 55-bar
+                    # breakout window. (100 bars made any 200-period MA permanently
+                    # NaN, which silently disabled whole strategies.)
+                    data_ltf = data_fetcher.get_historical_data(symbol, mt5.TIMEFRAME_M5, 200)
+                    data_htf = data_fetcher.get_historical_data(symbol, mt5.TIMEFRAME_H1, 300)
+                    data_struct = data_fetcher.get_historical_data(symbol, mt5.TIMEFRAME_H4, 300)
 
                     if data_ltf is None or data_htf is None: continue
 
@@ -635,8 +713,23 @@ def main():
                     if signal_res['signal'] != 'HOLD':
                         # --- EXECUTION LOGIC ---
                         strategy_used = signal_res.get('strategy', 'Unknown')
-                        # Use .get() without default so None triggers execute_trade's fallback to tick.ask/bid
+                        # Strategies may declare filters that provably hurt them (each
+                        # bypass is documented where the signal is generated).
+                        bypass = set(signal_res.get('bypass_filters', []))
+                        # Some strategies return an explicit limit entry, most do not.
+                        # CRASH FIX: entry_price used to stay None and was then used in
+                        # arithmetic below (abs(None - sl) -> TypeError), which would
+                        # kill the bot the first time SilverBullet or RajaBanks fired.
+                        # Falling back to the live tick here is exactly the price
+                        # execute_trade() would have used anyway.
                         entry_price = signal_res.get('entry_price')
+                        if entry_price is None:
+                            _tick_entry = symbol_cache.get_tick(symbol)
+                            if _tick_entry is None:
+                                logger.warning(f"[{symbol}] No tick available - skipping signal.")
+                                continue
+                            entry_price = (_tick_entry.ask if 'BUY' in signal_res['signal']
+                                           else _tick_entry.bid)
                         
                         # Check strategy performance (Expectancy-Based)
                         strat_perf = performance_tracker.get_strategy_metrics(strategy_used)
@@ -664,13 +757,13 @@ def main():
                                     continue
 
                         # Sentiment Guard (Institutional Wind)
-                        if not sentiment_manager.is_aligned(symbol, signal_res['signal']):
+                        if 'sentiment' not in bypass and not sentiment_manager.is_aligned(symbol, signal_res['signal']):
                             logger.info(f"[{symbol}] Signal {signal_res['signal']} blocked by Macro Sentiment (DXY Conflict)")
                             continue
 
                         # H4 Bias Filter (Trend Alignment)
                         h4_data = symbol_cache.get_rates(symbol, mt5.TIMEFRAME_H4, 2)
-                        if h4_data is not None and len(h4_data) >= 2:
+                        if 'h4_bias' not in bypass and h4_data is not None and len(h4_data) >= 2:
                             last_h4 = h4_data.iloc[-1]
                             h4_bias = "BULLISH" if last_h4['close'] > last_h4['open'] else "BEARISH"
                             if (signal_res['signal'] == 'BUY' and h4_bias != "BULLISH") or \
@@ -679,18 +772,40 @@ def main():
                                 continue
                         
                         # Exhaustion Wick Guard (Institutional Rejection)
-                        if PriceAction.is_exhaustion_candle(data_ltf.iloc[-1], signal_res['signal']):
+                        if 'exhaustion' not in bypass and PriceAction.is_exhaustion_candle(data_ltf.iloc[-1], signal_res['signal']):
                             logger.info(f"[{symbol}] Signal {signal_res['signal']} blocked: Exhaustion Wick detected (Fading Momentum).")
                             continue
 
-                        # RR Filter Check
+                        # RR Filter Check (skipped for strategies with no fixed target -
+                        # a trend system's reward is unknown by construction)
                         risk_pips = abs(entry_price - signal_res['sl'])
                         reward_pips = abs(signal_res['tp'] - entry_price)
                         rr = reward_pips / risk_pips if risk_pips > 0 else 0
                         
-                        if rr < getattr(config, 'MINIMUM_RR_THRESHOLD', 1.0):
+                        if 'rr' not in bypass and rr < getattr(config, 'MINIMUM_RR_THRESHOLD', 1.0):
                             logger.info(f"[{symbol}] Skipping trade - Poor RR: {rr:.2f} (Min: {config.MINIMUM_RR_THRESHOLD})")
                             continue
+
+                        # --- COST-TO-RISK GUARD -------------------------------------
+                        # A 25-point gold spread is $0.25 of guaranteed loss per trade.
+                        # If that is more than MAX_COST_RATIO_OF_R of 1R, the setup
+                        # cannot pay for itself no matter how good the signal is.
+                        tick_for_cost = symbol_cache.get_tick(symbol)
+                        if tick_for_cost:
+                            spread_price = abs(tick_for_cost.ask - tick_for_cost.bid)
+                            _sym_info = symbol_cache.get_info(symbol)
+                            _contract = getattr(_sym_info, "trade_contract_size", 0) or 100.0
+                            # commission is charged per lot: convert it into price terms
+                            commission_price = 7.0 / _contract
+                            risk_price = abs(entry_price - signal_res['sl'])
+                            cost_ratio = (spread_price + commission_price) / risk_price if risk_price > 0 else 1.0
+                            max_ratio = getattr(config, 'MAX_COST_RATIO_OF_R', 0.12)
+                            if max_ratio > 0 and cost_ratio > max_ratio:
+                                logger.info(
+                                    f"[{symbol}] Entry blocked: cost is {cost_ratio:.1%} of 1R "
+                                    f"(limit {max_ratio:.0%}). Stop too tight for the spread."
+                                )
+                                continue
 
                         # Calculate lot size with House Money protection
                         risk_manager.day_start_equity = day_start_equity
@@ -728,7 +843,7 @@ def main():
 
                             # --- SFP REJECTION GUARD (Liquidity Sweep) ---
                             # Block if we just swept a significant high/low and rejected
-                            if PriceAction.is_liquidity_sweep_rejection(symbol_cache.get_data(symbol, mt5.TIMEFRAME_M5), signal_res['signal']):
+                            if 'sfp' not in bypass and PriceAction.is_liquidity_sweep_rejection(symbol_cache.get_data(symbol, mt5.TIMEFRAME_M5), signal_res['signal']):
                                 logger.info(f"[{symbol}] SFP GUARD: Liquidity sweep detected in opposite direction. Signal rejected.")
                                 continue
 
@@ -741,6 +856,29 @@ def main():
                             if trade_res and hasattr(trade_res, 'retcode') and trade_res.retcode == mt5.TRADE_RETCODE_DONE:
                                 logger.info(f"[{symbol}] TRADE EXECUTED | Order: {trade_res.order} | Price: {trade_res.price}")
                                 order_manager.add_trade(trade_res.order, signal_res['sl'], signal_res['tp'], strategy_used)
+                                # Remember this strategy's management plan (trail speed,
+                                # partial TP policy) so live exits match the backtest.
+                                if signal_res.get('manage'):
+                                    trade_manager.set_plan(trade_res.order, strategy_used, signal_res['manage'])
+                                # Record the trade in R at entry: the risk taken is
+                                # known NOW (lot size x stop distance), which is the
+                                # only reliable way to compute R at exit.
+                                if trade_ledger is not None:
+                                    try:
+                                        _info = symbol_cache.get_info(symbol)
+                                        _contract = getattr(_info, 'trade_contract_size', 0) or 100.0
+                                        _risk_price = abs(float(entry_price) - float(signal_res['sl']))
+                                        trade_ledger.record_open(
+                                            ticket=getattr(trade_res, 'order', 0),
+                                            symbol=symbol, strategy=strategy_used,
+                                            entry=float(trade_res.price or entry_price),
+                                            sl=float(signal_res['sl']), lots=float(lot_size),
+                                            risk_cash=_risk_price * _contract * float(lot_size),
+                                            deal=getattr(trade_res, 'deal', None),
+                                        )
+                                    except Exception as e:
+                                        logger.warning(f"Ledger write failed for {symbol}: "
+                                                       f"{type(e).__name__}: {e}")
                                 daily_trade_count += 1
                                 trading_days.add(current_time_utc.strftime("%Y-%m-%d"))
                                 if symbol in failed_executions: del failed_executions[symbol]

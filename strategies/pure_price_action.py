@@ -10,8 +10,9 @@ class PurePriceActionStrategy(Strategy):
         super().__init__(name, symbol)
 
     def generate_signal(self, data_ltf, data_htf, data_struct, current_time):
-        if current_time.tzinfo is None: current_time = pytz.UTC.localize(current_time)
-        t = current_time.astimezone(config.LONDON_TIMEZONE).time()
+        # BUG FIX: naive timestamps are BROKER time, not UTC (see core/time_utils).
+        from core.time_utils import session_time
+        t = session_time(current_time, config.LONDON_TIMEZONE).time()
         start = datetime.strptime(config.RAJA_SESSION_START, "%H:%M").time()
         end = datetime.strptime(config.RAJA_SESSION_END, "%H:%M").time()
         if not (start <= t <= end): return {'signal': 'HOLD', 'reason': "Outside Session"}

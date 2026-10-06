@@ -6,3 +6,5 @@ requests
 matplotlib
 seaborn
 python-dotenv
+# research harness / market maps: parquet cache + map rendering
+pyarrow>=15.0

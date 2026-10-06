@@ -60,6 +60,33 @@ class RiskManager:
         if sl_distance == 0:
             return 0.0
 
+        # --- COST-AWARE MINIMUM STOP -----------------------------------------
+        # Guaranteed friction per trade (spread + commission) must stay a small
+        # fraction of 1R, or the account bleeds even when the signals are good.
+        # Measured on real XAUUSD data: a 25-point spread costs ~8-9 percentage
+        # points of win rate when 1R is only 1.5xATR(M5).
+        import config as _cfg
+        min_points = getattr(_cfg, 'MIN_STOP_DISTANCE_POINTS', {}).get(symbol, 0)
+        if min_points and sl_distance < min_points * symbol_info.point:
+            msg = (f"🚫 <b>TRADE BLOCKED</b>\n[{symbol}] Stop is {sl_distance/symbol_info.point:.0f} points, "
+                   f"minimum is {min_points}. Spread/commission would eat the trade.")
+            self.logger.warning(f"TRADE BLOCKED | [{symbol}] stop {sl_distance/symbol_info.point:.0f}pts "
+                                f"< min {min_points}pts")
+            if alert_manager:
+                alert_manager.send_message(msg)
+            return 0.0
+
+        max_cost_ratio = getattr(_cfg, 'MAX_COST_RATIO_OF_R', 0.12)
+        if max_cost_ratio > 0 and tick and symbol_info:
+            spread_price = abs(tick.ask - tick.bid)
+            commission_price = 7.0 / symbol_info.trade_contract_size if symbol_info.trade_contract_size else 0.0
+            if (spread_price + commission_price) / sl_distance > max_cost_ratio:
+                self.logger.warning(
+                    f"TRADE BLOCKED | [{symbol}] cost is "
+                    f"{(spread_price + commission_price)/sl_distance:.1%} of 1R "
+                    f"(limit {max_cost_ratio:.0%})")
+                return 0.0
+
         # Risk amount in account currency (e.g. USD)
         risk_amount = self.account_balance * risk_percent
         

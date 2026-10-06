@@ -8,7 +8,18 @@ load_dotenv()
 
 # --- Symbols & Magic Number ---
 # Mixed symbol naming (Gold is standard, Forex has "c" suffix)
-SYMBOLS = ["XAUUSD", "GBPJPY", "EURUSD", "AUDUSD", "USDJPY"]
+#
+# WHY ONLY XAUUSD BY DEFAULT
+# --------------------------
+# Every symbol in the old list ran the same intraday ICT families (sweep-fade,
+# breakout-continuation, trend-pullback). On 1.16M M1 bars of real XAUUSD data
+# (2023-2026) each of those families tested NEGATIVE before costs and around
+# -0.27R after costs; the exact numbers are in research/out/ and XAUUSD_EDGE_REPORT.md.
+# Only the gold trend system (GoldTrendStrategy) tested positive out-of-sample,
+# and it is only validated on XAUUSD. Trading the other pairs with unvalidated
+# strategies is how the account was being drained, so they are disabled until
+# each one is individually researched the same way.
+SYMBOLS = ["XAUUSD"]
 MAGIC_NUMBER = 786786
 
 CORRELATION_GROUPS = [
@@ -18,13 +29,28 @@ CORRELATION_GROUPS = [
 ]
 
 # --- Strategy Mapping ---
+# GoldTrendStrategy is the only strategy in this repo with a positive
+# out-of-sample expectancy on real XAUUSD data (see XAUUSD_EDGE_REPORT.md).
+#
+# The legacy intraday strategies are kept in the repo for reference/backtesting
+# but are NOT enabled by default: each one tested between -0.15R and -0.40R per
+# trade over 27k-49k trades, i.e. they lose faster the more often they trade.
+# To re-enable one, add its name back to the list below AND re-run
+# research/family_search.py to confirm it has an edge on your own data first.
+LEGACY_STRATEGIES_ENABLED = False
+
 SYMBOL_STRATEGY_MAP = {
-    "XAUUSD": ["RajaBanksStrategy", "PurePriceActionStrategy", "SilverBulletStrategy"],
-    "GBPJPY": ["RajaBanksStrategy", "PurePriceActionStrategy", "SilverBulletStrategy"],
-    "EURUSD": ["PurePriceActionStrategy", "SilverBulletStrategy"],
-    "AUDUSD": ["PurePriceActionStrategy", "SilverBulletStrategy"],
-    "USDJPY": ["PurePriceActionStrategy", "SilverBulletStrategy"]
+    "XAUUSD": ["GoldTrendStrategy"],
 }
+if LEGACY_STRATEGIES_ENABLED:
+    SYMBOL_STRATEGY_MAP.update({
+        "XAUUSD": ["GoldTrendStrategy", "RajaBanksStrategy", "PurePriceActionStrategy",
+                   "SilverBulletStrategy"],
+        "GBPJPY": ["RajaBanksStrategy", "PurePriceActionStrategy", "SilverBulletStrategy"],
+        "EURUSD": ["PurePriceActionStrategy", "SilverBulletStrategy"],
+        "AUDUSD": ["PurePriceActionStrategy", "SilverBulletStrategy"],
+        "USDJPY": ["PurePriceActionStrategy", "SilverBulletStrategy"],
+    })
 
 SYMBOL_PIP_SIZE = {
     "XAUUSD": 0.1,    # Gold pips
@@ -35,10 +61,14 @@ SYMBOL_PIP_SIZE = {
 }
 
 # --- FUNDED CHALLENGE SETTINGS ($5k Account) ---
-RISK_PERCENT = 1.0              # Risk 1.0% per trade (Required for 30-day time limits)
-MAX_TOTAL_OPEN_RISK_PERCENT = 3.0 # Max risk across all open trades
+# Validated default: 0.75% risk per trade matches research/validate_live.py, which
+# produced 9.0% CAGR / -5.4% max drawdown over 2023-2026. The 21-year walk-forward
+# (research/long_history.py) at 0.5% risk produced 1.4% CAGR / -3.8% worst drawdown
+# -- treat THAT as the honest expectation and this period as a good market.
+RISK_PERCENT = 0.75             # Risk per trade (% of balance)
+MAX_TOTAL_OPEN_RISK_PERCENT = 2.0 # Max risk across all open trades (one position at a time)
 DYNAMIC_RISK_SCALING = True     # Scale risk down as we approach profit target
-MAX_DAILY_TRADES = 6            # Allow more attempts per day
+MAX_DAILY_TRADES = 2            # Safety cap: the validated system averages ~1.3 trades/MONTH
 DAILY_PROFIT_TARGET_PERCENT = 3.0  # Lock in 3% daily gains to compound quickly
 OVERALL_PROFIT_TARGET_PERCENT = 8.0 # $400 overall target
 MAX_DAILY_LOSS_PERCENT = 4.0        # $200 daily limit (extra safety buffer)
@@ -74,7 +104,11 @@ VOLATILITY_EMA_PERIOD = 20       # Period to calculate average volatility
 VOLATILITY_THRESHOLD = 1.5       # Reduce risk if Current Vol > 1.5x Average
 
 # Safety Settings
-DAILY_GOAL_PERCENT = 1.5        # $75 goal (lock profit for day)
+# Daily profit target. 0 = DISABLED, which is correct for a trend system: closing
+# a position because the day went well chops exactly the trends that pay for the
+# losers. The daily LOSS limit below is the one that protects you. Set this back
+# to 1.5-3.0 only if you are running a high-frequency mean-reversion system.
+DAILY_GOAL_PERCENT = 0.0
 FRIDAY_CLOSE_HOUR = 20          # Close all at 8 PM Friday
 COAST_MODE_THRESHOLD = 7.0      # At 7% profit, reduce risk to "coast" to 8% target
 COAST_MODE_RISK = 0.1           # 0.1% risk in Coast Mode
@@ -128,3 +162,100 @@ PURE_PA_RR = 2.0
 # --- Timezone ---
 NY_TIMEZONE = pytz.timezone('America/New_York')
 LONDON_TIMEZONE = pytz.timezone('Europe/London')
+
+
+# ============================================================================
+#  GOLD TREND STRATEGY  (strategies/gold_trend.py)
+# ----------------------------------------------------------------------------
+#  Donchian breakout on H4 with an ATR trailing stop, long-only.
+#  Evidence (see XAUUSD_EDGE_REPORT.md and research/out/):
+#    * 21-year walk-forward, params picked on prior 4y only (ATR(14)):
+#      +30.3% total, 12/17 positive years, worst year -3.8%, worst DD -4.8% @0.5% risk
+#    * full 21.3y sample of this exact config: 338 trades, +0.260R, PF 1.54, DD -5.2%
+#    * live-code replay 2023-2026 @0.75% risk: +33.9%, CAGR 9.0%, max DD -5.4%,
+#      52 trades, profit factor 2.97
+#    * the same rules trading long AND short roughly halved the return
+#  This is a low-frequency system: ~1.3 trades a month. Do not expect it to pass
+#  an 8%-in-30-days challenge - see research/challenge_sim.py for why that is a
+#  lottery (3-15% pass odds even with a genuine edge).
+# ============================================================================
+GOLD_TREND_ENABLED = True
+GOLD_TREND_TIMEFRAME = "H4"      # "H4" (validated) or "H1"
+GOLD_TREND_LOOKBACK = 55         # Donchian window in bars (walk-forward chose 55)
+GOLD_TREND_ATR_PERIOD = 14       # ATR period. research/shipping_config.py reads this
+                                 # value and research/check_config_parity.py asserts
+                                 # the harness cannot drift away from it.
+GOLD_TREND_STOP_ATR = 2.0        # Initial stop = 2.0 x ATR(H4) from entry
+GOLD_TREND_TRAIL_ATR = 4.0       # Chandelier trail = 4.0 x ATR(H4) from the extreme
+GOLD_TREND_REGIME_FILTER = True  # Only buy above the long moving average
+GOLD_TREND_REGIME_SMA = 200      # MA length (clamped to available history)
+GOLD_TREND_ALLOW_SHORTS = False  # Shorts roughly halved the 21-year return
+GOLD_TREND_REQUIRE_NEW_BAR = True # One signal per closed bar, no re-firing
+
+# ============================================================================
+#  OPERATIONAL HEALTH MONITORS  (core/health_monitor.py, core/trade_ledger.py)
+# ----------------------------------------------------------------------------
+#  Two failures are invisible in a live log: a strategy that has silently
+#  stopped producing signals, and an edge that has decayed. Both are measured
+#  from a ledger of closed trades in R (multiples of the risk taken), the same
+#  unit the 21-year research used.
+#
+#  Calibration, measured two ways on the 21-year, 338-trade shipping run:
+#    * a 20-trade window breaches -0.30R in 2.5% of windows (8 of 319), but
+#      drawing 20-trade stretches at random from the same outcome distribution
+#      breaches it 8.2% of the time -- too twitchy for a stop rule;
+#    * a 30-trade window NEVER breached -0.30R in the real sequence (0 of 309),
+#      while random draws of the same size breach it 3.6% of the time. That is
+#      the margin wanted: silence on a working system, a signal when something
+#      has genuinely changed.
+#    * mean gap between entries ~23 days, so 60 days of silence is ~2.6x normal
+#  Note the edge guard is deliberately SLOW: at 1.3 trades/month, 30 trades is
+#  ~2 years. Fast protection is the account-level guardian (daily loss / trailing
+#  drawdown); this one catches a slow bleed that never trips those.
+#
+#  A halt stops NEW entries only -- open trades keep their stops and their
+#  management plan. Clearing a halt is deliberately manual: review the logs
+#  first, then call health_monitor.clear_halt() or delete logs/health_state.json.
+# ============================================================================
+HEALTH_MONITOR_ENABLED = True
+SILENCE_ALERT_DAYS = 60          # alert when no entry has been taken for this long
+SILENCE_ALERT_REPEAT_DAYS = 30   # minimum gap between repeats of that alert
+EDGE_STOP_TRADES = 30            # rolling window of closed trades (see calibration)
+EDGE_STOP_EXPECTANCY_R = -0.30   # halt new entries at/below this rolling expectancy
+TRADE_LEDGER_PATH = "logs/trade_ledger.jsonl"
+HEALTH_STATE_PATH = "logs/health_state.json"
+
+# --- Cost awareness (why most retail gold bots lose) ---
+# A 25-point gold spread costs $0.25 round trip. If your stop is 1R = $5 then
+# friction alone eats 5% of every trade before you are right about anything.
+# These two guards refuse trades whose cost-to-risk ratio is hopeless.
+MIN_STOP_DISTANCE_POINTS = {
+    "XAUUSD": 400,   # $4.00 - refuses any setup with a tighter stop than this
+    "GBPJPY": 40,
+    "EURUSD": 25,
+    "AUDUSD": 25,
+    "USDJPY": 30,
+}
+MAX_COST_RATIO_OF_R = 0.12       # Block any trade where (spread+commission) > 12% of 1R
+
+# --- Per-strategy position management ---
+# The validated gold system is managed with a slow H4 chandelier trail and takes
+# NO partial profits and NO breakeven stop - both of those were tested and they cut
+# the right tail that pays for the losers. Legacy intraday strategies keep the old
+# behaviour. Keys are strategy name prefixes.
+STRATEGY_MANAGEMENT = {
+    "GoldTrend": {
+        "trail_atr_mult": GOLD_TREND_TRAIL_ATR,
+        "trail_atr_timeframe": GOLD_TREND_TIMEFRAME,
+        "partial_tp_rr": 0.0,     # disabled for this strategy
+        "breakeven_rr": 0.0,      # disabled for this strategy
+        "trail_after_r": 0.0,     # start trailing immediately
+    },
+}
+DEFAULT_MANAGEMENT = {
+    "trail_atr_mult": 2.5,
+    "trail_atr_timeframe": "M5",
+    "partial_tp_rr": PARTIAL_TP_RR,
+    "breakeven_rr": BREAKEVEN_RR,
+    "trail_after_r": 1.0,
+}
