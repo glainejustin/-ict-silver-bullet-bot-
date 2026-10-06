@@ -49,5 +49,5 @@ jobs:
 
       - name: Byte-compile all modules (catches syntax errors early)
         run: |
-          python -m py_compile app.py config.py db.py pipeline.py run_pipeline.py scheduler.py
+          python -m py_compile app.py config.py db.py pipeline.py rental_pipeline.py run_pipeline.py scheduler.py
           python -m py_compile connectors/*.py agents/*.py outreach/*.py

@@ -62,6 +62,14 @@ DRY_RUN_OUTREACH = _bool("DRY_RUN_OUTREACH", True)
 MIN_BMV_PERCENT = _int("MIN_BMV_PERCENT", 15)
 MIN_ROI_PERCENT = _int("MIN_ROI_PERCENT", 12)
 
+# ---- Lettings / commission (landlord pays, tenant never pays — see
+# docs/LETTINGS_LEGAL_COMPLIANCE.md) ----
+COMMISSION_TYPE = os.getenv("COMMISSION_TYPE", "one_month_rent")  # one_month_rent | percent_of_annual_rent | flat_fee
+try:
+    COMMISSION_VALUE = float(os.getenv("COMMISSION_VALUE", "1"))
+except ValueError:
+    COMMISSION_VALUE = 1.0
+
 # ---- Dashboard ----
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "change-me")
 DASHBOARD_PORT = _int("DASHBOARD_PORT", 8000)

@@ -14,6 +14,15 @@ Use this checklist the day your situation changes (see triggers below) to go
 from "code that works" to "business that's legally running" as fast as
 possible, because the hard technical work will already be done.
 
+This applies equally to **both lines built in this repo**: the property
+sourcing/deal-packaging side, and the lettings/rental referral side. The
+lettings module has its own legal-compliance notes and agreement template —
+see [`docs/LETTINGS_LEGAL_COMPLIANCE.md`](LETTINGS_LEGAL_COMPLIANCE.md) and
+[`docs/LETTINGS_INTRODUCTION_AGREEMENT_TEMPLATE.md`](LETTINGS_INTRODUCTION_AGREEMENT_TEMPLATE.md).
+Neither line should be operated for real — outreach sent, fees taken,
+landlords/tenants contacted for real — until an adviser confirms your status
+allows it.
+
 ## Triggers that commonly change what's allowed
 *(confirm current rules for your exact case with an adviser — don't rely on this list)*
 - You're granted **Indefinite Leave to Remain (ILR)** / settled status.
@@ -37,6 +46,12 @@ possible, because the hard technical work will already be done.
 - [ ] Get a sourcing agreement / terms of business template reviewed by a
       solicitor — a starting draft is in
       [`docs/SOURCING_AGREEMENT_TEMPLATE.md`](SOURCING_AGREEMENT_TEMPLATE.md).
+- [ ] If operating the lettings side too: get the landlord introduction
+      agreement reviewed by a solicitor — a starting draft is in
+      [`docs/LETTINGS_INTRODUCTION_AGREEMENT_TEMPLATE.md`](LETTINGS_INTRODUCTION_AGREEMENT_TEMPLATE.md) —
+      and re-confirm with an adviser that your redress scheme/AML
+      registration covers lettings agency work, not just sourcing (they are
+      regulated separately in the UK).
 - [ ] Open a business bank account in the legal operator's name.
 
 ## Day 1 of going live — technical steps (all in this repo already)

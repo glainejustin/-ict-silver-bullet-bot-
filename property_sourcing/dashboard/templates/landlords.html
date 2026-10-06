@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="{{ url_for('rentals') }}">&larr; back to rentals</a>
+<h1>Landlords</h1>
+
+<form method="post" class="buyer-form">
+  <input name="name" placeholder="Name" required>
+  <input name="email" placeholder="Email" type="email">
+  <input name="phone" placeholder="Phone">
+  <input name="notes" placeholder="Notes" style="flex-basis: 100%;">
+  <button type="submit">Add landlord</button>
+</form>
+
+<table class="leads">
+  <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Notes</th></tr></thead>
+  <tbody>
+  {% for l in landlords %}
+    <tr>
+      <td>{{ l.name }}</td>
+      <td>{{ l.email or '—' }}</td>
+      <td>{{ l.phone or '—' }}</td>
+      <td>{{ l.notes or '—' }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4">No landlords yet — add one above.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

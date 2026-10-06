@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="{{ url_for('rentals') }}">&larr; back to rentals</a>
+<h1>Add a rental listing</h1>
+<p>Only add a listing once the landlord has given you permission to find them
+a tenant — see <code>docs/LETTINGS_INTRODUCTION_AGREEMENT_TEMPLATE.md</code>.</p>
+
+<form method="post" class="buyer-form">
+  <input name="address" placeholder="Address" required style="flex-basis: 100%;">
+  <input name="postcode" placeholder="Postcode" required>
+  <select name="property_type">
+    <option value="terraced">Terraced</option>
+    <option value="semi">Semi-detached</option>
+    <option value="detached">Detached</option>
+    <option value="flat">Flat</option>
+    <option value="other">Other</option>
+  </select>
+  <input name="bedrooms" placeholder="Bedrooms" type="number">
+  <input name="monthly_rent" placeholder="Monthly rent (£)" type="number">
+  <input name="available_from" placeholder="Available from (YYYY-MM-DD)">
+  <select name="furnishing">
+    <option value="unfurnished">Unfurnished</option>
+    <option value="furnished">Furnished</option>
+    <option value="part-furnished">Part-furnished</option>
+  </select>
+  <select name="landlord_id">
+    <option value="">No landlord on file yet</option>
+    {% for l in landlords %}
+    <option value="{{ l.id }}">{{ l.name }}</option>
+    {% endfor %}
+  </select>
+  <input name="motivation_signal" placeholder="Notes" style="flex-basis: 100%;">
+  <button type="submit">Add listing</button>
+</form>
+{% endblock %}

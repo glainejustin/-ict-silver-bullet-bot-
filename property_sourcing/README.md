@@ -12,10 +12,20 @@
 > immigration advice — confirm your situation with an OISC-registered
 > adviser or immigration solicitor.
 
-An automated, AI-agent-driven engine for running a **UK property deal-sourcing
-business** (find below-market-value deals → package them → match to
-investors → draft outreach → sell the lead for a sourcing fee) with as close
-to zero cost and zero daily involvement as realistically possible.
+An automated, AI-agent-driven engine for running two related **UK property
+businesses**, both built with as close to zero cost and zero daily
+involvement as realistically possible:
+
+1. **Sourcing** — find below-market-value deals → package them → match to
+   investors → draft outreach → sell the lead for a one-off sourcing fee.
+2. **Lettings referral** — find rental listings (landlord leads) and tenant
+   leads → match a tenant to a listing → introduce them → earn a referral
+   commission **from the landlord only**. No fee is ever charged to the
+   tenant — see
+   [`docs/LETTINGS_LEGAL_COMPLIANCE.md`](docs/LETTINGS_LEGAL_COMPLIANCE.md)
+   for why (Tenant Fees Act 2019) and
+   [`agents/commission.py`](agents/commission.py) for how that rule is
+   enforced in code.
 
 > **Read this first:** no software can legally register a company, open a
 > bank account, or make you compliant with UK property law on its own. See
@@ -62,11 +72,45 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 python run_pipeline.py --demo     # ingest, value, analyze & draft outreach for 4 sample leads
+                                   # + 2 demo rental listings matched to 2 demo tenants
 python app.py                      # open http://localhost:8000
 ```
 
-That's it — you'll see a scored, analyzed deal pipeline and drafted investor
-emails without needing a single API key.
+That's it — you'll see a scored, analyzed deal pipeline, drafted investor
+emails, and (on the "Lettings" tab) two demo rental listings matched to two
+demo tenants with drafted landlord-introduction emails and calculated
+commission — all without needing a single API key.
+
+## The lettings/rental referral module
+
+```
+Landlord leads (CSV/manual)   Tenant leads (CSV/public form)
+        │                             │
+        └──────────────┬──────────────┘
+                        ▼
+      agents/rental_matcher.py matches on area, budget, bedrooms
+                        ▼
+   agents/commission.py calculates the fee (landlord pays — always)
+                        ▼
+  outreach/rental_outreach_writer.py drafts an intro email to the
+  landlord sharing only an anonymised tenant profile (no contact
+  details) until the landlord confirms interest
+                        ▼
+      Landlord agrees → mark as let → commission invoice PDF
+      (outreach/commission_invoice.py) — states on its face that
+      no fee has been or will be charged to the tenant
+```
+
+- `COMMISSION_TYPE` / `COMMISSION_VALUE` in `.env` control how the fee is
+  calculated: `one_month_rent` (default, multiplier of one month's rent),
+  `percent_of_annual_rent`, or `flat_fee`.
+- Rental listings and tenant leads can be imported from CSV
+  (`connectors/rental_csv_import.py`, `connectors/tenant_csv_import.py`,
+  `--rental-csv` / `--tenant-csv` flags on `run_pipeline.py`) or added by
+  hand on the dashboard's "Lettings" tab.
+- Same safety posture as the sourcing side: `DRY_RUN_OUTREACH` governs
+  whether landlord intro emails are actually sent or just drafted, and the
+  demo data is fictional throughout.
 
 ## Making it real
 
@@ -108,25 +152,39 @@ emails without needing a single API key.
   **"Download deal pack (PDF)"** button that generates a client-ready one-pager.
 - **Buyer CRM** — your investor list and matching criteria.
 - **Re-run valuation** on any single lead on demand.
+- **Lettings tab** — rental listings, tenant leads, landlords, one-click
+  "find matching tenants now", "mark as let", and a
+  **"Commission invoice (PDF)"** button (landlord-only fee, by design).
 
 ## Project layout
 
 ```
-connectors/     7 free, ToS-safe data sources that find raw leads
-agents/         the "AI" — valuation, deal scoring, buyer matching, email writing
-outreach/       SMTP sending, PDF deal-pack generator, the daily digest email
-dashboard/      the Flask web UI templates/assets
-pipeline.py     orchestrates connectors → agents → outreach, one call
+connectors/     7 free, ToS-safe data sources that find raw leads, plus
+                rental_csv_import.py / tenant_csv_import.py for lettings
+agents/         the "AI" — valuation, deal scoring, buyer matching, email
+                writing, plus commission.py / rental_matcher.py for lettings
+outreach/       SMTP sending, PDF deal-pack generator, the daily digest
+                email, plus rental_outreach_writer.py (landlord intro
+                emails) / commission_invoice.py (PDF) for lettings
+dashboard/      the Flask web UI templates/assets (sales + lettings tabs)
+pipeline.py     orchestrates connectors → agents → outreach, one call (sales)
+rental_pipeline.py   same, for lettings: ingest listings/tenants → match →
+                draft/send landlord intros → track commission
 scheduler.py    runs pipeline.py forever, on a timer, unattended
 app.py          the dashboard web server
-run_pipeline.py CLI to run everything once (supports --demo)
-seed/           offline demo data + your buyer CRM starter file
-tests/          automated tests (run `pytest`), including a full offline
-                end-to-end pipeline test and mocked tests for every connector
-                — these run automatically on every push via GitHub Actions
+run_pipeline.py CLI to run everything once (supports --demo, --rentals,
+                --rental-csv, --tenant-csv)
+seed/           offline demo data: leads, buyers, rental listings, tenants,
+                landlords
+tests/          automated tests (run `pytest`), including full offline
+                end-to-end pipeline tests (sales + lettings) and mocked
+                tests for every connector — these run automatically on
+                every push via GitHub Actions
                 (see `.github/workflows/property-sourcing-tests.yml`)
-docs/           legal compliance checklist, launch checklist, sourcing
-                agreement template, deployment guide, architecture notes
+docs/           legal compliance checklists (sourcing + lettings), launch
+                checklist, sourcing agreement template, lettings
+                introduction agreement template, deployment guide,
+                architecture notes
 deploy/systemd/ ready-made systemd service files for VPS deployment
 Dockerfile, docker-compose.yml, Procfile, render.yaml
                 four different one-command deployment options for later

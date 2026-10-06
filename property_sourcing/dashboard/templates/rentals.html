@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="stats">
+  <div class="stat-card"><span class="num">{{ stats.rental_listings }}</span><span class="label">Rental listings</span></div>
+  <div class="stat-card"><span class="num">{{ stats.rental_available }}</span><span class="label">Available</span></div>
+  <div class="stat-card"><span class="num">{{ stats.tenants }}</span><span class="label">Tenant leads</span></div>
+  <div class="stat-card"><span class="num">{{ stats.rental_let }}</span><span class="label">Let</span></div>
+  <div class="stat-card hot"><span class="num">£{{ '{:,.0f}'.format(stats.commission_pending) }}</span><span class="label">Commission pending</span></div>
+</section>
+
+{% if dry_run %}
+<div class="banner warn">
+  Dry-run mode is ON — landlord introduction emails are drafted but not sent.
+</div>
+{% endif %}
+
+<section class="actions">
+  <a href="{{ url_for('add_rental_listing') }}"><button type="button">+ Add rental listing</button></a>
+  <a href="{{ url_for('tenants') }}"><button type="button" class="secondary">Manage tenant leads</button></a>
+  <a href="{{ url_for('landlords') }}"><button type="button" class="secondary">Manage landlords</button></a>
+</section>
+
+<section class="filters">
+  <a href="{{ url_for('rentals') }}" class="{{ 'active' if not status_filter }}">All</a>
+  <a href="{{ url_for('rentals', status='available') }}" class="{{ 'active' if status_filter=='available' }}">Available</a>
+  <a href="{{ url_for('rentals', status='under_offer') }}" class="{{ 'active' if status_filter=='under_offer' }}">Under offer</a>
+  <a href="{{ url_for('rentals', status='let') }}" class="{{ 'active' if status_filter=='let' }}">Let</a>
+</section>
+
+<table class="leads">
+  <thead>
+    <tr>
+      <th>Address / Postcode</th>
+      <th>Landlord</th>
+      <th>Rent pcm</th>
+      <th>Bedrooms</th>
+      <th>Available from</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for listing in listings %}
+    <tr>
+      <td><a href="{{ url_for('rental_listing_detail', listing_id=listing.id) }}">{{ listing.address or listing.postcode or '—' }}</a></td>
+      <td>{{ landlords_by_id.get(listing.landlord_id).name if listing.landlord_id and landlords_by_id.get(listing.landlord_id) else '—' }}</td>
+      <td>{{ '£{:,.0f}'.format(listing.monthly_rent) if listing.monthly_rent else '—' }}</td>
+      <td>{{ listing.bedrooms or '—' }}</td>
+      <td>{{ listing.available_from or '—' }}</td>
+      <td><span class="badge">{{ listing.status }}</span></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">No rental listings yet — add one, or run the demo pipeline from the main Pipeline page.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

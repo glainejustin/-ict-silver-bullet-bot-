@@ -11,8 +11,9 @@ from flask import Flask, redirect, render_template, request, send_file, url_for
 import config
 import db
 import pipeline
-from agents import comp_finder, deal_analyzer
-from outreach import deal_pack, email_sender
+import rental_pipeline
+from agents import comp_finder, commission, deal_analyzer, rental_matcher
+from outreach import commission_invoice, deal_pack, email_sender, rental_outreach_writer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
@@ -143,9 +144,171 @@ def run_pipeline_now():
         cli.setup_demo_data()
         cli._seed_buyers_if_empty(config.SEED_DIR / "buyers_seed.csv")
         pipeline.run_full_pipeline(extra_csv_paths=[str(config.SEED_DIR / "demo_leads.csv")])
+
+        cli._seed_landlords_if_empty(config.SEED_DIR / "landlords_seed.csv")
+        rental_pipeline.ingest_rental_data(
+            extra_listing_csv_paths=[str(config.SEED_DIR / "rental_listings_demo.csv")],
+            extra_tenant_csv_paths=[str(config.SEED_DIR / "tenants_demo.csv")],
+        )
+        cli._link_demo_listings_to_first_landlord()
+        rental_pipeline.match_and_draft_rental_outreach()
     else:
         pipeline.run_full_pipeline()
+        rental_pipeline.run_rental_pipeline()
     return redirect(url_for("index"))
+
+
+# ---------------------------------------------------------------------------
+# Lettings module
+# ---------------------------------------------------------------------------
+
+@app.route("/rentals")
+def rentals():
+    status_filter = request.args.get("status")
+    listings = db.list_rental_listings(status=status_filter)
+    landlords_by_id = {l["id"]: l for l in db.list_landlords()}
+    return render_template(
+        "rentals.html",
+        listings=listings,
+        landlords_by_id=landlords_by_id,
+        stats=db.rental_stats(),
+        status_filter=status_filter,
+        dry_run=config.DRY_RUN_OUTREACH,
+    )
+
+
+@app.route("/rentals/add", methods=["GET", "POST"])
+def add_rental_listing():
+    if request.method == "POST":
+        postcode = request.form.get("postcode", "").strip().upper()
+        from connectors.base import BaseConnector
+
+        landlord_id = request.form.get("landlord_id")
+        listing = {
+            "source": "manual",
+            "source_ref": f"manual-{db.now()}",
+            "landlord_id": int(landlord_id) if landlord_id else None,
+            "address": request.form.get("address"),
+            "postcode": postcode,
+            "outcode": BaseConnector.outcode_of(postcode),
+            "property_type": request.form.get("property_type") or "other",
+            "bedrooms": int(request.form["bedrooms"]) if request.form.get("bedrooms") else None,
+            "monthly_rent": float(request.form["monthly_rent"]) if request.form.get("monthly_rent") else None,
+            "available_from": request.form.get("available_from"),
+            "furnishing": request.form.get("furnishing"),
+            "motivation_signal": request.form.get("motivation_signal") or "Manually added rental listing",
+            "raw_data": {},
+        }
+        listing_id, _ = db.upsert_rental_listing(listing)
+        return redirect(url_for("rental_listing_detail", listing_id=listing_id))
+
+    return render_template("add_rental_listing.html", landlords=db.list_landlords())
+
+
+@app.route("/rentals/<int:listing_id>")
+def rental_listing_detail(listing_id):
+    listing = db.get_rental_listing(listing_id)
+    matches = db.list_rental_matches(listing_id)
+    landlord = None
+    if listing and listing.get("landlord_id"):
+        landlord = next((l for l in db.list_landlords() if l["id"] == listing["landlord_id"]), None)
+    tenants_by_id = {t["id"]: t for t in db.list_tenants()}
+    return render_template(
+        "rental_listing_detail.html",
+        listing=listing,
+        matches=matches,
+        landlord=landlord,
+        tenants_by_id=tenants_by_id,
+        commission_terms=commission.describe_commission_terms(),
+    )
+
+
+@app.route("/rentals/<int:listing_id>/match-now", methods=["POST"])
+def match_listing_now(listing_id):
+    listing = db.get_rental_listing(listing_id)
+    if listing:
+        tenants = db.list_tenants()
+        matches = rental_matcher.find_matching_tenants(listing, tenants)
+        for tenant in matches:
+            existing = db.list_rental_matches(listing_id)
+            if any(m["tenant_id"] == tenant["id"] for m in existing):
+                continue
+            commission_amount = commission.calculate_commission(listing.get("monthly_rent"))
+            subject, body = rental_outreach_writer.draft_landlord_intro(listing, tenant, commission_amount)
+            db.add_rental_match(
+                {
+                    "listing_id": listing_id,
+                    "tenant_id": tenant["id"],
+                    "status": "draft",
+                    "subject": subject,
+                    "body": body,
+                    "commission_amount": commission_amount,
+                }
+            )
+    return redirect(url_for("rental_listing_detail", listing_id=listing_id))
+
+
+@app.route("/rentals/<int:listing_id>/mark-let/<int:tenant_id>", methods=["POST"])
+def mark_listing_let(listing_id, tenant_id):
+    db.update_rental_listing(listing_id, {"status": "let"})
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT id FROM rental_matches WHERE listing_id = ? AND tenant_id = ?", (listing_id, tenant_id)
+        ).fetchone()
+    if row:
+        db.update_rental_match(row["id"], {"status": "let", "commission_status": "pending"})
+    return redirect(url_for("rental_listing_detail", listing_id=listing_id))
+
+
+@app.route("/rentals/<int:listing_id>/commission-invoice/<int:tenant_id>.pdf")
+def commission_invoice_pdf(listing_id, tenant_id):
+    listing = db.get_rental_listing(listing_id)
+    tenant = db.get_tenant(tenant_id)
+    if not listing or not tenant:
+        return redirect(url_for("rentals"))
+    with db.get_conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM rental_matches WHERE listing_id = ? AND tenant_id = ?", (listing_id, tenant_id)
+        ).fetchone()
+    commission_amount = row["commission_amount"] if row else commission.calculate_commission(listing.get("monthly_rent"))
+    path = commission_invoice.build_commission_invoice(listing, tenant, commission_amount)
+    return send_file(path, as_attachment=True, download_name=f"commission_invoice_{listing_id}_{tenant_id}.pdf")
+
+
+@app.route("/tenants", methods=["GET", "POST"])
+def tenants():
+    if request.method == "POST":
+        db.add_tenant(
+            {
+                "name": request.form["name"],
+                "email": request.form.get("email"),
+                "phone": request.form.get("phone"),
+                "areas": [a.strip() for a in request.form.get("areas", "").split(",") if a.strip()],
+                "budget_max": float(request.form["budget_max"]) if request.form.get("budget_max") else None,
+                "bedrooms_needed": int(request.form["bedrooms_needed"]) if request.form.get("bedrooms_needed") else None,
+                "move_in_date": request.form.get("move_in_date"),
+                "notes": request.form.get("notes"),
+            }
+        )
+        return redirect(url_for("tenants"))
+
+    return render_template("tenants.html", tenants=db.list_tenants())
+
+
+@app.route("/landlords", methods=["GET", "POST"])
+def landlords():
+    if request.method == "POST":
+        db.add_landlord(
+            {
+                "name": request.form["name"],
+                "email": request.form.get("email"),
+                "phone": request.form.get("phone"),
+                "notes": request.form.get("notes"),
+            }
+        )
+        return redirect(url_for("landlords"))
+
+    return render_template("landlords.html", landlords=db.list_landlords())
 
 
 if __name__ == "__main__":

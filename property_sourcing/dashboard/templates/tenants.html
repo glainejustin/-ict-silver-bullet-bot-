@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="{{ url_for('rentals') }}">&larr; back to rentals</a>
+<h1>Tenant leads</h1>
+<p>This same form can be shared as a public "register your interest" link —
+nothing here commits a tenant to anything, and no fee is ever charged to them.</p>
+
+<form method="post" class="buyer-form">
+  <input name="name" placeholder="Full name" required>
+  <input name="email" placeholder="Email" type="email" required>
+  <input name="phone" placeholder="Phone">
+  <input name="areas" placeholder="Preferred areas (comma-separated, e.g. M14,M20)">
+  <input name="budget_max" placeholder="Budget max (£/month)" type="number">
+  <input name="bedrooms_needed" placeholder="Bedrooms needed" type="number">
+  <input name="move_in_date" placeholder="Move-in date (YYYY-MM-DD)">
+  <input name="notes" placeholder="Notes (references, guarantor, etc.)" style="flex-basis: 100%;">
+  <button type="submit">Add tenant lead</button>
+</form>
+
+<table class="leads">
+  <thead><tr><th>Name</th><th>Areas</th><th>Budget</th><th>Bedrooms</th><th>Move-in</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for t in tenants %}
+    <tr>
+      <td>{{ t.name }}</td>
+      <td>{{ t.areas | join(', ') }}</td>
+      <td>{{ '£{:,.0f}'.format(t.budget_max) if t.budget_max else 'any' }}</td>
+      <td>{{ t.bedrooms_needed or 'any' }}</td>
+      <td>{{ t.move_in_date or '—' }}</td>
+      <td><span class="badge">{{ t.status }}</span></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6">No tenant leads yet — add one above.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

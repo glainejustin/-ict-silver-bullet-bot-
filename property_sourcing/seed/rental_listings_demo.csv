@@ -1,0 +1,3 @@
+source_ref,address,postcode,property_type,bedrooms,monthly_rent,available_from,furnishing,motivation_signal
+RENT-001,"14 Oxford Road, Rusholme, Manchester",M14 5TQ,terraced,3,1200,2026-11-01,unfurnished,"Landlord relocating, wants a reliable long-term tenant"
+RENT-002,"Flat 3, 50 Wilmslow Road, Manchester",M14 6XA,flat,2,950,2026-10-20,furnished,"Returning student let, quick turnaround needed"

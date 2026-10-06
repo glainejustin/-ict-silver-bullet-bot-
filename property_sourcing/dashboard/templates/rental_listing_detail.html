@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="{{ url_for('rentals') }}">&larr; back to rentals</a>
+
+<h1>{{ listing.address or listing.postcode }}</h1>
+<p class="badge">{{ listing.status }}</p>
+
+<section class="actions">
+  <form method="post" action="{{ url_for('match_listing_now', listing_id=listing.id) }}" style="display:inline">
+    <button type="submit">Find matching tenants now</button>
+  </form>
+</section>
+
+<section class="grid">
+  <div><strong>Landlord</strong><br>{{ landlord.name if landlord else 'Not on file' }}</div>
+  <div><strong>Postcode</strong><br>{{ listing.postcode or '—' }}</div>
+  <div><strong>Property type</strong><br>{{ listing.property_type or '—' }}</div>
+  <div><strong>Bedrooms</strong><br>{{ listing.bedrooms or '—' }}</div>
+  <div><strong>Monthly rent</strong><br>{{ '£{:,.0f}'.format(listing.monthly_rent) if listing.monthly_rent else '—' }}</div>
+  <div><strong>Available from</strong><br>{{ listing.available_from or '—' }}</div>
+  <div><strong>Furnishing</strong><br>{{ listing.furnishing or '—' }}</div>
+  <div><strong>Commission terms</strong><br>{{ commission_terms }} (landlord pays, never the tenant)</div>
+</section>
+
+<h2>Notes</h2>
+<p>{{ listing.motivation_signal or '—' }}</p>
+
+<h2>Matched tenants &amp; introductions</h2>
+<table class="leads">
+  <thead><tr><th>Tenant</th><th>Status</th><th>Commission</th><th>Actions</th></tr></thead>
+  <tbody>
+  {% for m in matches %}
+    {% set tenant = tenants_by_id.get(m.tenant_id) %}
+    <tr>
+      <td>{{ tenant.name if tenant else 'Unknown' }}</td>
+      <td><span class="badge">{{ m.status }}</span></td>
+      <td>{{ '£{:,.0f}'.format(m.commission_amount) if m.commission_amount else '—' }} ({{ m.commission_status }})</td>
+      <td>
+        {% if m.status != 'let' %}
+        <form method="post" action="{{ url_for('mark_listing_let', listing_id=listing.id, tenant_id=m.tenant_id) }}" style="display:inline">
+          <button type="submit">Mark as let</button>
+        </form>
+        {% else %}
+        <a href="{{ url_for('commission_invoice_pdf', listing_id=listing.id, tenant_id=m.tenant_id) }}"><button type="button" class="secondary">Commission invoice (PDF)</button></a>
+        {% endif %}
+      </td>
+    </tr>
+    <tr><td colspan="4"><pre class="email-body">{{ m.body }}</pre></td></tr>
+  {% else %}
+    <tr><td colspan="4">No tenant matches yet — click "Find matching tenants now" above.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
