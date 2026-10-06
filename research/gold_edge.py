@@ -62,12 +62,27 @@ class TrendSim:
         commission_per_lot: float = 7.0,
         slippage_points: float = 2.0,
         leverage: int = 100,
+        point: float = POINT,
+        contract: float = CONTRACT,
+        lot_step: float = 0.01,
+        min_lot: float = 0.0,
     ):
         self.balance0 = balance
         self.balance = balance
         self.risk_pct = risk_pct
-        self.spread = spread_points * POINT
-        self.slip = slippage_points * POINT
+        # point/contract are overridable so the same simulator can model FX:
+        # gold is 0.01 / 100, a 5-digit FX pair is 0.0001 / 100000. Defaults are
+        # the gold values, so every existing research result is unchanged.
+        self.point = point
+        self.contract = contract
+        # Position-size granularity. Gold brokers quote 0.01 lots, which is far
+        # too coarse for JPY pairs on a small account: an ideal 0.0248-lot
+        # USDJPY position floors to 0.00 and the trade silently disappears.
+        # min_lot lets the model take the broker minimum instead of skipping.
+        self.lot_step = lot_step
+        self.min_lot = min_lot
+        self.spread = spread_points * point
+        self.slip = slippage_points * point
         self.comm = commission_per_lot
         self.leverage = leverage
         self.trades: list[dict] = []
@@ -79,10 +94,13 @@ class TrendSim:
         risk_price = abs(entry - stop)
         if risk_price <= 0:
             return 0.0
-        lots = risk_cash / (risk_price * CONTRACT)
-        max_lots = (self.balance * self.leverage) / (entry * CONTRACT)
+        lots = risk_cash / (risk_price * self.contract)
+        max_lots = (self.balance * self.leverage) / (entry * self.contract)
         lots = min(lots, max_lots)
-        return np.floor(lots / 0.01) * 0.01
+        lots = np.floor(lots / self.lot_step) * self.lot_step
+        if lots < self.min_lot:
+            lots = self.min_lot
+        return round(lots, 6)
 
     def run(self, bs: xau_data.BarSet, entry_tf: str = "H1", donchian: int = 55,
             atr_period: int = 20, trail_atr: float = 3.0, stop_atr: float = 2.0,
@@ -166,14 +184,14 @@ class TrendSim:
 
     # ------------------------------------------------------------------ ledger ---
     def _close(self, pos: dict, exit_price: float, ts) -> None:
-        gross = (exit_price - pos["entry"]) * pos["dir"] * CONTRACT * pos["lots"]
+        gross = (exit_price - pos["entry"]) * pos["dir"] * self.contract * pos["lots"]
         comm = self.comm * pos["lots"]
         pnl = gross - comm
         self.balance += pnl
         self.trades.append({
             "entry_time": pos["entry_time"], "exit_time": ts, "dir": pos["dir"],
             "lots": pos["lots"], "entry": pos["entry"], "exit": exit_price,
-            "pnl": pnl, "r": pnl / (pos["risk"] * CONTRACT * pos["lots"]),
+            "pnl": pnl, "r": pnl / (pos["risk"] * self.contract * pos["lots"]),
             "balance": self.balance,
         })
 

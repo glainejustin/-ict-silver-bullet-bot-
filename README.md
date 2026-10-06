@@ -181,6 +181,8 @@ ict_silver_bullet_bot/
 │   ├── validate_live.py        # replays the shipping strategy module end-to-end
 │   ├── challenge_sim.py        # funded-challenge pass probability
 │   ├── map_validation.py       # do market-map levels beat matched controls?
+│   ├── breadth_test.py         # same logic on FX: edge or gold-specific?
+│   ├── shipping_config.py      # the shipping params, read from config.py
 │   ├── check_config_parity.py  # guards research config vs shipped config
 │   └── run_all.py              # one command to reproduce the whole study
 │
@@ -337,6 +339,7 @@ python research/validate_live.py        # replays the SHIPPING strategy file end
 python research/check_config_parity.py  # fails if research config drifts from config.py
 python research/challenge_sim.py        # prop-challenge pass/fail probabilities
 python research/map_filter_test.py      # do market-map filters help? (permutation null)
+python research/breadth_test.py         # does it work on FX too? (diversification test)
 ```
 
 ### Market maps (volume profile / liquidity / depth)
@@ -349,7 +352,10 @@ python research/map_validation.py                      # are the levels worth an
 
 Measured against distance-matched controls over 21 years: **the POC "magnet" is a range-boundary artifact (55.6% → 49.2% once controlled), sweep-then-reverse is a coin flip (49.6% continuation, n=97,716), and the one real effect is that price travels 27% faster through low-volume nodes.** Details in [docs/MARKET_MAPS.md](docs/MARKET_MAPS.md).
 
-Read [XAUUSD_EDGE_REPORT.md](XAUUSD_EDGE_REPORT.md) for the strategy results.
+Read [XAUUSD_EDGE_REPORT.md](XAUUSD_EDGE_REPORT.md) for the strategy results, and
+[docs/NEXT_STEPS.md](docs/NEXT_STEPS.md) for what to do (and not do) next — including why a
+funded challenge is negative expected value with a 3.1% pass rate, and why adding FX pairs
+does not diversify a zero edge.
 
 ---
 

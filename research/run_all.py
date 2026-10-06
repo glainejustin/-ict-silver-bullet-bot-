@@ -39,6 +39,8 @@ STEPS = [
     ("map level validation", "research/map_validation.py",
      "do POC / value area / liquidity pools / HVN / round numbers beat "
      "distance-matched controls? (~30s)"),
+    ("portfolio breadth test", "research/breadth_test.py",
+     "does the same trend logic work on FX, and do the trades diversify?"),
     ("map filter test", "research/map_filter_test.py",
      "do map-context filters improve the trend system? (permutation null)"),
     ("challenge simulation", "research/challenge_sim.py",

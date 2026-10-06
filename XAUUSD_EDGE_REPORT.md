@@ -28,6 +28,12 @@
 
 6. **An 8%-in-30-days funded challenge is not winnable with a real edge on gold.** The validated system produces ~1.3 trades per 30 days. Simulated against the exact challenge rules (8% target, 5% trailing DD, 4% daily loss), the pass probability is **0.1% at 0.5% risk, 3.1% at 1%, 8% at 2%, 15.7% at 4%** — and raising risk increases the *failure* rate faster than the *pass* rate. The challenge structure, not your skill, decides the outcome.
 
+Put as an expected value: a pass is only worth buying if the average passed
+account pays out more than **`fee / pass_rate`** — at 1% risk that is **32× the
+challenge fee**. A $500 challenge would need ~$16,000 of expected lifetime payout
+per pass to break even. That is not a statement about your skill; it is what a
+3.1% pass rate does to the arithmetic. See [docs/NEXT_STEPS.md](docs/NEXT_STEPS.md) §1.
+
 ---
 
 ## 1. Why your strategies lose: the arithmetic
@@ -287,6 +293,35 @@ of the trading path. The one effect that did survive matched controls in
 nodes — is a statement about *speed*, not direction, and does not translate into
 an entry filter.
 
+### 3.7 Portfolio breadth: the same logic on FX — tested, and it does not generalise
+
+The system's real weakness is not its edge, it is its **rarity**: 338 trades in
+21.3 years. Almost all of the year-to-year variation is luck-of-the-draw rather
+than edge, so the obvious fix is more independent bets. `research/breadth_test.py`
+tests whether the same logic earns money elsewhere — five instruments, same
+window (2023-2026, gold sliced to match), same costs:
+
+| Instrument | Trades | Expectancy | 95% CI | PF |
+|---|---|---|---|---|
+| XAUUSD | 36 | **+0.545R** | [−0.117, +1.335] | 1.85 |
+| USDJPY | 60 | +0.083R | [−0.264, +0.463] | 1.23 |
+| GBPUSD | 55 | −0.114R | [−0.448, +0.263] | 0.84 |
+| EURUSD | 13 | −0.224R | [−0.714, +0.343] | 0.57 |
+| AUDUSD | 58 | −0.231R | [−0.542, +0.136] | 0.63 |
+| **Portfolio (all five)** | **222** | **+0.009R** | [−0.185, +0.222] | — |
+
+Diversification works mechanically — average pairwise monthly correlation was only
+**+0.15** — but adding four instruments with zero-or-negative expectancy produced
+a portfolio with **+0.009R** and a *deeper* drawdown (−7.4%) than gold alone
+(−1.1%). You cannot diversify a zero edge into a positive one.
+
+Two caveats, both important. First, 3.4 years is far too short to conclude the
+logic can't work on FX (the CIs all include zero) — but it is long enough to
+decline to *add* those instruments on this evidence. Second, note what the table
+says about gold: in this window even the gold edge's CI includes zero. The
+confidence in gold comes from the **21-year walk-forward**, not the recent rally.
+Which is the next point.
+
 ## 4. Setting expectations honestly
 
 ### 4.1 What your return actually is
@@ -327,8 +362,22 @@ If your goal is to pass a 30-day challenge, the honest options are: trade a long
 - Occasional large winners (the +15.8R trade is what pays for the string of −1Rs)
 - 3-4 losing months in a typical year
 - Drawdowns of 3-8% at 0.75% risk
+- **And the number that matters most: in the 21-year run, the longest stretch of trades below a previous equity peak was 116 trades — about 7.3 years at 1.3 trades/month.** Median 12-month outcome +1.4%, best +14.0%, worst −3.8%, 15/22 years positive
 
-If you cannot sit through that, the system will still fail — not because the edge disappeared, but because you will exit early.
+If you cannot sit through that, the system will still fail — not because the edge disappeared, but because you will exit early. This is why the recommendation is 0.5-0.75% risk rather than "enough to matter": the binding constraint is how long you can hold, not how much you make.
+
+### 4.4 A stop rule, so the decision is not made in the moment
+
+Over the 21-year shipping run the rolling **20-trade expectancy** had a median of
++0.184R and a 5th percentile of −0.252R:
+
+| Rolling 20-trade expectancy | Frequency when the system was working | Read |
+|---|---|---|
+| ≤ −0.20R | 10.7% of windows | normal bad run |
+| **≤ −0.30R** | **2.5% (8 of 319)** | **stop and investigate** |
+| ≤ −0.40R | 0.9% | almost certainly broken or decayed |
+
+Decide this now, in writing, while you are not losing money.
 
 ---
 
@@ -341,6 +390,9 @@ python research/fetch_data.py && python research/xau_data.py
 # reproduce the entire study (add "quick" to skip the heavy 21-year run)
 python research/run_all.py
 ```
+
+What to do with the results — and what not to do — is in
+[docs/NEXT_STEPS.md](docs/NEXT_STEPS.md).
 
 | File | What it does |
 |---|---|
@@ -356,6 +408,7 @@ python research/run_all.py
 | `research/shipping_config.py` | the shipping parameters, read from `config.py` — the harness cannot describe a different system |
 | `research/map_validation.py` | do market-map levels beat distance-matched controls? |
 | `research/map_filter_test.py` | do map context filters improve the trend system's P&L, against a permutation null? |
+| `research/breadth_test.py` | same logic on 4 FX pairs: is the edge gold-specific, and do the trades diversify? |
 | `core/market_map.py` | volume profile, liquidity pools, depth heatmap |
 | `tools/market_map_report.py` | renders the market map (history or live MT5) |
 | `docs/MARKET_MAPS.md` | what the maps are worth, measured |
