@@ -180,8 +180,13 @@ ict_silver_bullet_bot/
 │   ├── long_history.py         # 21-year walk-forward validation
 │   ├── validate_live.py        # replays the shipping strategy module end-to-end
 │   ├── challenge_sim.py        # funded-challenge pass probability
+│   ├── map_validation.py       # do market-map levels beat matched controls?
 │   ├── check_config_parity.py  # guards research config vs shipped config
 │   └── run_all.py              # one command to reproduce the whole study
+│
+├── core/market_map.py          # volume profile, liquidity pools, depth heatmap
+├── tools/market_map_report.py  # renders the market map (history or live MT5)
+├── docs/MARKET_MAPS.md         # what the maps are worth, measured
 │
 ├── backtesting/                # Generated reports & charts (gitignored)
 │
@@ -333,7 +338,17 @@ python research/check_config_parity.py  # fails if research config drifts from c
 python research/challenge_sim.py        # prop-challenge pass/fail probabilities
 ```
 
-Read [XAUUSD_EDGE_REPORT.md](XAUUSD_EDGE_REPORT.md) for the results.
+### Market maps (volume profile / liquidity / depth)
+
+```bash
+python tools/market_map_report.py --parquet research/data/XAUUSD_M15_2004_2025.parquet \
+    --freq D --bins 110 --out out/xauusd_map.png      # or --symbol XAUUSD for live MT5
+python research/map_validation.py                      # are the levels worth anything?
+```
+
+Measured against distance-matched controls over 21 years: **the POC "magnet" is a range-boundary artifact (55.6% → 49.2% once controlled), sweep-then-reverse is a coin flip (49.6% continuation, n=97,716), and the one real effect is that price travels 27% faster through low-volume nodes.** Details in [docs/MARKET_MAPS.md](docs/MARKET_MAPS.md).
+
+Read [XAUUSD_EDGE_REPORT.md](XAUUSD_EDGE_REPORT.md) for the strategy results.
 
 ---
 

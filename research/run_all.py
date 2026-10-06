@@ -19,6 +19,8 @@ ROOT = os.path.dirname(HERE)
 STEPS = [
     ("strategy regression tests", "tests/test_gold_trend.py",
      "closed-bar handling, one-signal-per-bar, and the disabled-by-NaN-MA failure mode"),
+    ("market map tests", "tests/test_market_map.py",
+     "profile/value-area maths, heatmap grid alignment, clustering"),
     ("config parity", "research/check_config_parity.py",
      "research/stub_config.py must mirror config.py or the numbers describe a different system"),
     ("build dataset", "research/xau_data.py", "M1 -> M5/H1/H4 with true UTC + NY/London clocks"),
@@ -34,6 +36,9 @@ STEPS = [
      "21 years, params chosen on prior 4y only, then traded out-of-sample"),
     ("live module validation", "research/validate_live.py",
      "replays the SHIPPING strategy module through the bot's own pipeline"),
+    ("map level validation", "research/map_validation.py",
+     "do POC / value area / liquidity pools / HVN / round numbers beat "
+     "distance-matched controls? (~30s)"),
     ("challenge simulation", "research/challenge_sim.py",
      "can an 8%-in-30-days funded challenge be passed with a real edge?"),
 ]
