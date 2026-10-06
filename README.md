@@ -28,6 +28,13 @@
 
 ---
 
+> 🏠 **Also in this repo:** [`property_sourcing/`](property_sourcing/README.md) — a separate,
+> unrelated project: an automated, AI-agent-driven UK property sourcing
+> business toolkit (lead finding, deal valuation, investor matching, and
+> outreach). See its own README for details.
+
+---
+
 ## 📖 Table of Contents
 
 - [Overview](#-overview)

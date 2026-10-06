@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<a href="{{ url_for('index') }}">&larr; back to pipeline</a>
+
+<h1>{{ lead.address or lead.postcode }}</h1>
+<p class="badge">{{ lead.status }}</p>
+
+<section class="grid">
+  <div><strong>Source</strong><br>{{ lead.source }} ({{ lead.motivation_signal or 'n/a' }})</div>
+  <div><strong>Postcode</strong><br>{{ lead.postcode or '—' }}</div>
+  <div><strong>Property type</strong><br>{{ lead.property_type or '—' }}</div>
+  <div><strong>Bedrooms</strong><br>{{ lead.bedrooms or '—' }}</div>
+  <div><strong>Asking price</strong><br>{{ '£{:,.0f}'.format(lead.asking_price) if lead.asking_price else '—' }}</div>
+  <div><strong>Estimated market value</strong><br>{{ '£{:,.0f}'.format(lead.estimated_market_value) if lead.estimated_market_value else '—' }}</div>
+  <div><strong>Below market value</strong><br>{{ lead.bmv_percent if lead.bmv_percent is not none else '—' }}%</div>
+  <div><strong>Refurb estimate</strong><br>{{ '£{:,.0f}'.format(lead.refurb_estimate) if lead.refurb_estimate else '—' }}</div>
+  <div><strong>Suggested strategy</strong><br>{{ lead.strategy or '—' }}</div>
+  <div><strong>Projected ROI</strong><br>{{ lead.roi_percent if lead.roi_percent is not none else '—' }}%</div>
+  <div><strong>Est. monthly cashflow</strong><br>{{ '£{:,.0f}'.format(lead.monthly_cashflow) if lead.monthly_cashflow else '—' }}</div>
+</section>
+
+<h2>AI analyst notes</h2>
+<p>{{ lead.notes or 'Not analyzed yet.' }}</p>
+
+<h2>Comparable sales used for valuation</h2>
+<table class="leads">
+  <thead><tr><th>Address</th><th>Sale price</th><th>Date</th><th>Type</th></tr></thead>
+  <tbody>
+  {% for c in comps %}
+    <tr><td>{{ c.address }}</td><td>£{{ '{:,.0f}'.format(c.sale_price) if c.sale_price else '—' }}</td><td>{{ c.sale_date }}</td><td>{{ c.property_type }}</td></tr>
+  {% else %}
+    <tr><td colspan="4">No comps found yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>Outreach to matched buyers</h2>
+<table class="leads">
+  <thead><tr><th>Recipient</th><th>Subject</th><th>Status</th><th>Action</th></tr></thead>
+  <tbody>
+  {% for o in outreach %}
+    <tr>
+      <td>{{ o.recipient }}</td>
+      <td>{{ o.subject }}</td>
+      <td><span class="badge">{{ o.status }}</span></td>
+      <td>
+        {% if o.status == 'draft' %}
+        <form method="post" action="{{ url_for('send_outreach', outreach_id=o.id) }}">
+          <button type="submit">Send now</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    <tr><td colspan="4"><pre class="email-body">{{ o.body }}</pre></td></tr>
+  {% else %}
+    <tr><td colspan="4">No outreach drafted yet — add matching buyers in the CRM first.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

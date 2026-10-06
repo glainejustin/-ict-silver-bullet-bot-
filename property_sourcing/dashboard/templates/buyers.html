@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Buyer / investor CRM</h1>
+<p>The AI agent only emails buyers who are already in this list and match a deal's
+area, budget, strategy and minimum ROI — add your real cash-buyer/investor list here.</p>
+
+<form method="post" class="buyer-form">
+  <input name="name" placeholder="Name" required>
+  <input name="email" placeholder="Email" type="email" required>
+  <input name="phone" placeholder="Phone">
+  <input name="areas" placeholder="Areas (comma-separated outcodes, e.g. M14,M20)">
+  <input name="budget_min" placeholder="Budget min (£)" type="number">
+  <input name="budget_max" placeholder="Budget max (£)" type="number">
+  <input name="strategies" placeholder="Strategies (comma-separated, e.g. BRRR,HMO)">
+  <input name="min_roi_percent" placeholder="Min ROI %" type="number">
+  <input name="notes" placeholder="Notes">
+  <button type="submit">Add buyer</button>
+</form>
+
+<table class="leads">
+  <thead><tr><th>Name</th><th>Email</th><th>Areas</th><th>Budget</th><th>Strategies</th><th>Min ROI</th></tr></thead>
+  <tbody>
+  {% for b in buyers %}
+    <tr>
+      <td>{{ b.name }}</td>
+      <td>{{ b.email }}</td>
+      <td>{{ b.areas | join(', ') }}</td>
+      <td>
+        {% if b.budget_min or b.budget_max %}
+          £{{ '{:,.0f}'.format(b.budget_min) if b.budget_min else '0' }} – £{{ '{:,.0f}'.format(b.budget_max) if b.budget_max else '∞' }}
+        {% else %}any{% endif %}
+      </td>
+      <td>{{ b.strategies | join(', ') }}</td>
+      <td>{{ b.min_roi_percent or '—' }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6">No buyers yet — add your first one above.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

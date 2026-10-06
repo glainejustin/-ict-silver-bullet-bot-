@@ -1,0 +1,4 @@
+name,email,phone,areas,budget_min,budget_max,strategies,min_roi_percent,notes
+Alex Carter (demo investor),alex.carter@example.com,07700900001,M14;M13;M20,50000,160000,BRRR;Flip,10,"Likes Manchester student-area terraces"
+Priya Shah (demo investor),priya.shah@example.com,07700900002,B1;B2;B3,100000,300000,HMO conversion;Buy-to-let,8,"Focused on Birmingham HMOs, 4+ bed only"
+Demo Cash Buyers Ltd,deals@example.com,07700900003,,,,,,"Generic catch-all buyer - replace with your real list"

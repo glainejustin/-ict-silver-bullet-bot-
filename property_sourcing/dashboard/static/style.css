@@ -1,0 +1,53 @@
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  background: #f5f6f8;
+  color: #1a1a2e;
+}
+.topnav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #111827;
+  color: white;
+  padding: 14px 24px;
+}
+.topnav .brand { font-weight: 700; }
+.topnav .links a { color: #d1d5db; text-decoration: none; margin-left: 20px; }
+.topnav .links a:hover { color: white; }
+main { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+
+.stats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.stat-card {
+  background: white; border-radius: 10px; padding: 16px 20px; min-width: 140px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08); text-align: center;
+}
+.stat-card.hot { border: 2px solid #f97316; }
+.stat-card .num { display: block; font-size: 28px; font-weight: 700; }
+.stat-card .label { font-size: 12px; color: #6b7280; }
+
+.banner.warn { background: #fef3c7; border: 1px solid #f59e0b; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; }
+
+.actions { margin-bottom: 16px; }
+button { background: #111827; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; margin-right: 8px; }
+button.secondary { background: #4b5563; }
+button:hover { opacity: 0.9; }
+
+.filters { margin-bottom: 12px; }
+.filters a { margin-right: 14px; text-decoration: none; color: #374151; padding: 4px 10px; border-radius: 6px; }
+.filters a.active { background: #111827; color: white; }
+
+table.leads { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
+table.leads th, table.leads td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 14px; }
+table.leads tr.hot { background: #fff7ed; }
+table.leads a { color: #111827; font-weight: 600; text-decoration: none; }
+
+.badge { background: #e5e7eb; border-radius: 20px; padding: 2px 10px; font-size: 12px; }
+
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; background: white; padding: 16px; border-radius: 10px; margin-bottom: 20px; }
+
+.email-body { white-space: pre-wrap; background: #f9fafb; padding: 12px; border-radius: 8px; font-size: 13px; }
+
+.buyer-form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; background: white; padding: 16px; border-radius: 10px; }
+.buyer-form input { flex: 1 1 160px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; }

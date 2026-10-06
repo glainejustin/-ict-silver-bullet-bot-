@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}Property Sourcing Autopilot{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <nav class="topnav">
+    <div class="brand">🏠 Property Sourcing Autopilot</div>
+    <div class="links">
+      <a href="{{ url_for('index') }}">Pipeline</a>
+      <a href="{{ url_for('buyers') }}">Buyer CRM</a>
+    </div>
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

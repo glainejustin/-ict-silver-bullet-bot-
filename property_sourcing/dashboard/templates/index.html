@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="stats">
+  <div class="stat-card"><span class="num">{{ stats.total_leads }}</span><span class="label">Total leads</span></div>
+  <div class="stat-card hot"><span class="num">{{ stats.hot_deals }}</span><span class="label">Hot deals (&ge;{{ min_bmv }}% BMV)</span></div>
+  <div class="stat-card"><span class="num">{{ stats.outreach_drafted }}</span><span class="label">Outreach drafted</span></div>
+  <div class="stat-card"><span class="num">{{ stats.outreach_sent }}</span><span class="label">Outreach sent</span></div>
+  <div class="stat-card"><span class="num">{{ stats.buyers }}</span><span class="label">Buyers in CRM</span></div>
+</section>
+
+{% if dry_run %}
+<div class="banner warn">
+  Dry-run mode is ON — outreach emails are being drafted but not actually sent.
+  Set <code>DRY_RUN_OUTREACH=false</code> in <code>.env</code> once you're happy with the output.
+</div>
+{% endif %}
+
+<section class="actions">
+  <form method="post" action="{{ url_for('run_pipeline_now') }}" style="display:inline">
+    <button type="submit">Run pipeline now (live connectors)</button>
+  </form>
+  <form method="post" action="{{ url_for('run_pipeline_now') }}" style="display:inline">
+    <input type="hidden" name="demo" value="1">
+    <button type="submit" class="secondary">Run demo pipeline (offline, no API keys)</button>
+  </form>
+</section>
+
+<section class="filters">
+  <a href="{{ url_for('index') }}" class="{{ 'active' if not status_filter }}">All</a>
+  <a href="{{ url_for('index', status='new') }}" class="{{ 'active' if status_filter=='new' }}">New</a>
+  <a href="{{ url_for('index', status='analyzed') }}" class="{{ 'active' if status_filter=='analyzed' }}">Analyzed</a>
+  <a href="{{ url_for('index', status='outreach_drafted') }}" class="{{ 'active' if status_filter=='outreach_drafted' }}">Outreach drafted</a>
+  <a href="{{ url_for('index', status='lead_to_research') }}" class="{{ 'active' if status_filter=='lead_to_research' }}">Needs research</a>
+</section>
+
+<table class="leads">
+  <thead>
+    <tr>
+      <th>Address / Postcode</th>
+      <th>Source</th>
+      <th>Asking</th>
+      <th>Est. value</th>
+      <th>BMV%</th>
+      <th>ROI%</th>
+      <th>Strategy</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for lead in leads %}
+    <tr class="{{ 'hot' if (lead.bmv_percent or 0) >= min_bmv }}">
+      <td><a href="{{ url_for('lead_detail', lead_id=lead.id) }}">{{ lead.address or lead.postcode or '—' }}</a></td>
+      <td>{{ lead.source }}</td>
+      <td>{{ '£{:,.0f}'.format(lead.asking_price) if lead.asking_price else '—' }}</td>
+      <td>{{ '£{:,.0f}'.format(lead.estimated_market_value) if lead.estimated_market_value else '—' }}</td>
+      <td>{{ lead.bmv_percent if lead.bmv_percent is not none else '—' }}</td>
+      <td>{{ lead.roi_percent if lead.roi_percent is not none else '—' }}</td>
+      <td>{{ lead.strategy or '—' }}</td>
+      <td><span class="badge">{{ lead.status }}</span></td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">No leads yet — click "Run demo pipeline" above to see it work end to end.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

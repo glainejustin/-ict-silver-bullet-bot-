@@ -1,0 +1,5 @@
+source_ref,address,postcode,property_type,bedrooms,asking_price,motivation_signal
+DEMO-001,"22 Beech Street, Rusholme, Manchester",M14 5TQ,terraced,3,98000,"Probate sale - executors want a quick hassle-free completion"
+DEMO-002,"Flat 1, 45 Wilmslow Road, Rusholme, Manchester",M14 6XA,flat,2,79000,"Landlord retiring and selling whole portfolio"
+DEMO-003,"5 Park Road, Birmingham",B1 1AC,detached,5,190000,"Divorce sale - needs to complete within 8 weeks"
+DEMO-004,"10 Oak Lane, Rusholme, Manchester",M14 5TT,terraced,3,150000,"Standard estate agent listing - for comparison only"

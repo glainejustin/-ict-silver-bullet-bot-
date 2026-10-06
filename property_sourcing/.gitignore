@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+data/*.db
+data/land_registry_cache/
+*.sqlite3
