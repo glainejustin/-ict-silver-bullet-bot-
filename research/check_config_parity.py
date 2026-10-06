@@ -49,6 +49,30 @@ def parse_config_literals() -> dict:
     return out
 
 
+def check_shipping_config(real: dict) -> list[tuple]:
+    """
+    The research harness must describe the SAME system the bot trades.
+
+    TrendSim's ATR default was 20 while the shipping module uses config's
+    GOLD_TREND_ATR_PERIOD (14), so published numbers described a slightly
+    different system. research/shipping_config.py now reads config.py, and this
+    asserts the values it reads are the ones that came out of the AST.
+    """
+    import importlib
+    importlib.import_module("research.shipping_config")
+    sc = sys.modules["research.shipping_config"]
+    kw = sc.trend_kwargs()
+    pairs = [
+        ("entry_tf", kw["entry_tf"], real.get("GOLD_TREND_TIMEFRAME", "H4")),
+        ("donchian", kw["donchian"], real.get("GOLD_TREND_LOOKBACK", 55)),
+        ("atr_period", kw["atr_period"], real.get("GOLD_TREND_ATR_PERIOD", 14)),
+        ("stop_atr", float(kw["stop_atr"]), float(real.get("GOLD_TREND_STOP_ATR", 2.0))),
+        ("trail_atr", float(kw["trail_atr"]), float(real.get("GOLD_TREND_TRAIL_ATR", 4.0))),
+        ("long_only", kw["long_only"], not bool(real.get("GOLD_TREND_ALLOW_SHORTS", False))),
+    ]
+    return [("shipping." + k, a, b) for k, a, b in pairs if a != b]
+
+
 def main() -> int:
     real = parse_config_literals()
     # the stub installs itself as sys.modules["config"]; read the installed module
@@ -63,6 +87,15 @@ def main() -> int:
             mismatches.append((k, cfg_val, stub_val))
 
     print(f"config.py keys found: {len(real)}/{len(KEYS)}")
+    ship_mismatches = check_shipping_config(real)
+    if not ship_mismatches:
+        print("✅ research/shipping_config.py uses the shipped GOLD_TREND_* parameters.")
+    else:
+        print("❌ research/shipping_config.py does NOT match config.py:")
+        for k, a, b in ship_mismatches:
+            print(f"     {k}: research={a}  config.py={b}")
+        mismatches = list(mismatches) + ship_mismatches
+
     if not mismatches:
         print("✅ config.py and research/stub_config.py agree on every mirrored value.")
         return 0

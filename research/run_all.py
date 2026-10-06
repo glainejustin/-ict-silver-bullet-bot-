@@ -39,6 +39,8 @@ STEPS = [
     ("map level validation", "research/map_validation.py",
      "do POC / value area / liquidity pools / HVN / round numbers beat "
      "distance-matched controls? (~30s)"),
+    ("map filter test", "research/map_filter_test.py",
+     "do map-context filters improve the trend system? (permutation null)"),
     ("challenge simulation", "research/challenge_sim.py",
      "can an 8%-in-30-days funded challenge be passed with a real edge?"),
 ]

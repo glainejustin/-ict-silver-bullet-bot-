@@ -32,7 +32,13 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from research import xau_data  # noqa: E402
+from research import shipping_config  # noqa: E402
 from research.gold_edge import POINT, CONTRACT, TrendSim  # noqa: E402
+
+# The shipping system's parameters come from config.py via shipping_config, so
+# this harness cannot describe a different system from the one that trades.
+SHIP = shipping_config.trend_kwargs()
+ATR_PERIOD = SHIP["atr_period"]
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data", "XAUUSD_M15_2004_2025.parquet")
@@ -99,6 +105,7 @@ def year_table(trades: pd.DataFrame, balance0: float = 5000.0) -> pd.DataFrame:
 
 def run(hist: Frames, **kw) -> tuple[dict, pd.DataFrame]:
     sim = TrendSim(balance=5000.0, risk_pct=0.5)
+    kw.setdefault("atr_period", ATR_PERIOD)      # shipping value unless overridden
     m = sim.run(hist, **kw)
     return m, pd.DataFrame(sim.trades)
 

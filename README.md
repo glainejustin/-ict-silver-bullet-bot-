@@ -42,7 +42,7 @@ Every strategy in this repo was tested against **1,162,584 M1 bars (2023-2026) a
 
 **Why the ICT strategies lose is arithmetic, not luck:** a 25-point gold spread shifts your target further and your stop closer by $0.25 each. With 1R ≈ $4 on M5, friction alone costs **0.17R per trade** — and it removes ~8-9 percentage points of win-rate. The same spread costs only **0.01R** on an H4 stop. Frequency and stop size had to change; no amount of parameter tuning fixes this.
 
-**Enabled by default:** `GoldTrendStrategy` on XAUUSD only. Walk-forward validated (parameters chosen on prior 4 years, traded untouched): **+27.1% over 17 out-of-sample years, 12/17 positive, worst year −4.1%, worst drawdown −3.8%** at 0.5% risk. It trades ~1.3 times a **month**.
+**Enabled by default:** `GoldTrendStrategy` on XAUUSD only. Walk-forward validated (parameters chosen on prior 4 years, traded untouched): **+30.3% over 17 out-of-sample years, 12/17 positive, worst year −3.8%, worst drawdown −4.8%** at 0.5% risk — 338 trades over 21.3 years, **+0.260R per trade**, profit factor 1.54. It trades ~1.3 times a **month**.
 
 **Honest expectation:** with a genuine edge of +0.2R/trade and ~27 trades/year, this compounds to single-digit annual percentages with small drawdowns — *not* 8% in 30 days. An 8%/30-day funded challenge with this edge has a 3-15% pass rate ([research/challenge_sim.py](research/challenge_sim.py)). Anything promising more is selling you variance.
 
@@ -336,6 +336,7 @@ Key extra checks:
 python research/validate_live.py        # replays the SHIPPING strategy file end-to-end
 python research/check_config_parity.py  # fails if research config drifts from config.py
 python research/challenge_sim.py        # prop-challenge pass/fail probabilities
+python research/map_filter_test.py      # do market-map filters help? (permutation null)
 ```
 
 ### Market maps (volume profile / liquidity / depth)

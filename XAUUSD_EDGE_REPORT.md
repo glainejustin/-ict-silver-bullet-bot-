@@ -19,9 +19,9 @@
 
    | | Result |
    |---|---|
-   | 21-year walk-forward (2009-2025, 17 years out-of-sample) | **+27.1%**, 12/17 positive years, worst year −4.1%, worst drawdown −3.8% (at 0.5% risk/trade) |
-   | Full 21-year sample (0.5% risk) | CAGR 2.2%, max DD −9.8%, profit factor 1.48, **+0.205R per trade** over 582 trades |
-   | Parameter grid (24 combos) | **every single one positive** (CAGR 1.1% → 4.0%) |
+   | 21-year walk-forward (2009-2025, 17 years out-of-sample) | **+30.3%**, 12/17 positive years, worst year −3.8%, worst drawdown −4.8% (at 0.5% risk/trade) |
+   | Full 21-year sample of the shipping config (0.5% risk) | CAGR 1.7%, max DD −5.2%, profit factor 1.54, **+0.260R per trade** over 338 trades |
+   | Parameter grid (24 combos) | **every single one positive** (CAGR 1.0% → 4.1%) |
    | Live-code replay 2023-2026 (0.75% risk, M1 fills) | +33.9%, CAGR 9.0%, max DD −5.4%, PF 2.97, 52 trades |
 
 5. **The honest expectation is modest, and that is the point.** At 0.5-1% risk per trade you are looking at roughly **1-6% a year with small drawdowns**, not 8% a month. Anyone promising you 8-10% in 30 days from gold scalping is selling you variance, and the maths below shows exactly how that ends.
@@ -151,7 +151,7 @@ Implemented in `strategies/gold_trend.py`, wired into `config.py`, and validated
 
 - **Cost drag collapses from 0.17R to 0.01R.** 1R is 2 × ATR(H4) ≈ $60 instead of $4. The spread becomes irrelevant instead of decisive.
 - **The right tail is uncapped.** 2R/3R fixed targets cap exactly the moves that pay for a trend system. The trailing stop lets a winner run: the validated 21-year run had a best trade of +15.8R, and the 2023-2026 replay averaged +0.85R per trade.
-- **It only trades with gold's drift.** Long-only beat long+short in every test: full 21-year CAGR 2.2% vs 2.6% *but* with far fewer trades and a much better PF (1.48 vs 1.29); on the recent 3.4-year sample, long-only scored PF 3.23 vs 1.55 for long+short. Shorts on gold fight the drift, the spread and the trend simultaneously.
+- **It only trades with gold's drift.** Long-only beat long+short in every test, on the shipping configuration: full 21-year PF **1.54 vs 1.28** (+0.260R vs +0.145R); 2020-2026 slice PF **1.79 vs 1.32**; 2023-2026 slice PF **1.85 vs 1.30**. Shorts on gold fight the drift, the spread and the trend simultaneously.
 - **It barely trades.** 1.3 trades a month means the 0.17R-per-trade problem simply never gets a chance to compound.
 
 ### 3.3 Out-of-sample evidence (the part that matters)
@@ -160,36 +160,36 @@ Walk-forward: for each year, parameters were chosen on the **prior four years on
 
 | Year | Chosen params | Trades | Return | PF | Max DD |
 |---|---|---|---|---|---|
-| 2009 | D55 / trail4 | 17 | +1.4% | 1.42 | −1.7% |
-| 2010 | D20 / trail4 | 26 | +2.7% | 1.84 | −1.3% |
-| 2011 | D55 / trail4 | 13 | +4.1% | 2.49 | −1.1% |
-| 2012 | D55 / trail4 | 14 | −0.6% | 0.81 | −1.4% |
-| 2013 | D40 / trail4 | 10 | −0.2% | 0.87 | −1.0% |
-| 2014 | D55 / trail4 | 16 | −1.4% | 0.61 | −1.7% |
-| 2015 | D30 / trail4 | 16 | +0.2% | 1.07 | −1.1% |
-| 2016 | D30 / trail4 | 17 | +4.5% | 2.48 | −1.5% |
-| 2017 | D30 / trail4 | 19 | +3.3% | 2.36 | −1.2% |
-| 2018 | D30 / trail3 | 22 | −2.8% | 0.45 | −3.8% |
-| 2019 | D30 / trail3 | 25 | +3.6% | 1.82 | −1.4% |
-| 2020 | D55 / trail4 | 11 | +5.2% | 3.96 | −1.4% |
-| 2021 | D55 / trail3 | 22 | −4.1% | 0.15 | −3.8% |
-| 2022 | D55 / trail4 | 11 | +2.1% | 2.25 | −0.7% |
-| 2023 | D55 / trail4 | 16 | +2.5% | 1.69 | −1.1% |
-| 2024 | D55 / trail4 | 15 | +3.8% | 2.35 | −1.0% |
-| 2025 | D55 / trail4 | 2 | +0.4% | 1.92 | −0.4% |
+| 2009 | D20 / trail4 | 24 | +3.7% | 1.62 | −2.7% |
+| 2010 | D20 / trail4 | 27 | +1.8% | 1.51 | −1.4% |
+| 2011 | D20 / trail4 | 24 | +2.1% | 1.57 | −1.3% |
+| 2012 | D20 / trail3 | 27 | −0.1% | 0.97 | −1.8% |
+| 2013 | D20 / trail3 | 18 | −1.7% | 0.34 | −1.5% |
+| 2014 | D40 / trail2 | 21 | +0.6% | 1.21 | −1.4% |
+| 2015 | D30 / trail2 | 23 | +0.1% | 1.05 | −1.4% |
+| 2016 | D30 / trail3 | 17 | +5.7% | 4.08 | −0.9% |
+| 2017 | D30 / trail3 | 23 | +2.5% | 1.84 | −1.0% |
+| 2018 | D30 / trail4 | 21 | −3.8% | 0.34 | −4.8% |
+| 2019 | D30 / trail3 | 24 | +5.7% | 2.41 | −1.4% |
+| 2020 | D55 / trail3 | 13 | +7.0% | 4.68 | −1.3% |
+| 2021 | D55 / trail3 | 21 | −3.3% | 0.21 | −3.1% |
+| 2022 | D55 / trail4 | 11 | +2.0% | 2.11 | −0.7% |
+| 2023 | D55 / trail4 | 16 | +1.4% | 1.36 | −1.7% |
+| 2024 | D55 / trail4 | 15 | +3.8% | 2.25 | −1.2% |
+| 2025 | D40 / trail4 | 4 | −0.1% | 0.83 | −0.9% |
 
-**Aggregate: +27.1% over 17 years (1.4% CAGR), 12/17 years positive, worst year −4.1%, worst drawdown −3.8%.** Note it made money in the 2011-2015 bear market years it traded (2012 −0.6%, 2013 −0.2%, 2014 −1.4%) rather than blowing up — a long-only system goes to cash when the trend breaks.
+**Aggregate: +30.3% over 17 years (1.6% CAGR), 12/17 years positive, worst year −3.8%, worst drawdown −4.8%.** Note how it behaved in the 2011-2015 bear market years it traded (2012 −0.1%, 2013 −1.7%, 2014 +0.6%) — it went flat rather than blowing up — a long-only system goes to cash when the trend breaks.
 
 Parameter sensitivity — CAGR% across the whole grid:
 
 | Donchian ↓ / Trail → | 2.0 | 3.0 | 4.0 | 5.0 |
 |---|---|---|---|---|
-| 10 | 2.3 | 3.2 | 3.7 | **4.0** |
-| 20 | 1.8 | 2.2 | 2.5 | 3.4 |
-| 30 | 1.8 | 2.3 | 2.7 | 3.2 |
-| 40 | 1.4 | 1.6 | 2.1 | 2.8 |
-| **55** | 1.2 | 1.7 | 2.1 | 2.8 |
-| 80 | 1.1 | 1.5 | 1.8 | 2.4 |
+| 10 | 2.3 | 3.2 | 3.4 | **4.1** |
+| 20 | 1.8 | 2.2 | 2.4 | 3.2 |
+| 30 | 1.8 | 2.3 | 2.5 | 2.8 |
+| 40 | 1.4 | 2.0 | 2.2 | 2.5 |
+| **55** | 1.3 | 1.8 | **1.7** | 2.3 |
+| 80 | 1.0 | 1.7 | 1.5 | 2.3 |
 
 **Every one of the 24 combinations is positive.** That is what a real (if modest) edge looks like — it is not a knife-edge parameter fit. The shipping defaults (55 / 4.0) are the conservative end of the grid, not the optimised peak.
 
@@ -211,6 +211,81 @@ Replaying `strategies/gold_trend.py` — the actual shipping file — through th
 **Treat this as the good case, not the base case.** The 21-year walk-forward (1.4% CAGR) is the honest anchor; 2023-2026 was an exceptional gold bull market and this period flatters the system accordingly.
 
 ---
+
+### 3.5 A correction I owe you, and the fix that prevents a repeat
+
+While testing market-map filters (below) I found that the research harness and the
+shipping strategy were **not quite the same system**: `strategies/gold_trend.py`
+reads `GOLD_TREND_ATR_PERIOD = 14` from `config.py`, but the harness's
+`TrendSim` defaulted to `ATR(20)`. Every published number therefore described an
+ATR(20) system while the bot traded ATR(14).
+
+The correction is small, and it is now structural rather than remembered:
+
+| ATR period | Trades | Expectancy | PF | CAGR | Max DD |
+|---|---|---|---|---|---|
+| 10 | 337 | +0.295R | 1.57 | 1.8% | −4.3% |
+| **14 (shipping)** | **338** | **+0.260R** | **1.54** | **1.7%** | **−5.2%** |
+| 20 (was in the report) | 332 | +0.320R | 1.65 | 2.1% | −4.8% |
+| 30 | 331 | +0.273R | 1.54 | 1.8% | −6.5% |
+
+The conclusion does not change — all four are positive, and the ATR period is not
+a fragile knob. Everything in §3.3 and the TL;DR has been regenerated with
+ATR(14) so that the report and the bot describe one system.
+
+`research/shipping_config.py` now reads the parameters out of `config.py`
+(AST-parsed, because `config.py` imports MetaTrader5), every research script
+that claims to describe the shipping system takes them from there, and
+`research/check_config_parity.py` asserts that the two still agree. That is the
+same class of bug as the `stub_config` drift in §2, and it now has the same
+kind of guard.
+
+### 3.6 Market-map context filters: tested, and rejected
+
+The repo now builds market maps — volume profile with POC and value area,
+clustered liquidity pools, HVN/LVN, round numbers (`core/market_map.py`,
+[docs/MARKET_MAPS.md](docs/MARKET_MAPS.md)). The obvious next question is whether
+map context improves the trend system, so `research/map_filter_test.py` tests it
+properly: run the shipping system over 21 years, annotate every trade with map
+features computed **only from data before the entry**, then split trades by each
+feature and measure expectancy.
+
+The critical control is a **permutation null**: shuffle the feature labels 2,000
+times and record how big a difference appears by chance when you split ~270
+trades in two. Without it, "the good half of my trades made +0.44R and the bad
+half +0.19R" reads like an edge. With it:
+
+| Filter | Trades kept | Expectancy in / out | Difference | p (shuffle) |
+|---|---|---|---|---|
+| Entry in HVN (top third of volume-at-price) | 90 / 267 | +0.438R / +0.194R | +0.244R | 0.35 |
+| Entry in LVN (bottom third) | 92 / 267 | +0.295R / +0.266R | +0.029R | 0.91 |
+| Pool within 0.21 ATR overhead | 134 / 267 | +0.260R / +0.293R | −0.033R | 0.90 |
+| Entry above the prior week's value area | 226 / 267 | +0.219R / +0.591R | −0.372R | 0.29 |
+| Far from prior session POC (>1.57 ATR) | 118 / 267 | +0.131R / +0.392R | −0.261R | 0.29 |
+| Near a round $10 level (<0.38 ATR) | 133 / 267 | +0.175R / +0.377R | −0.202R | 0.44 |
+
+**Nothing survives.** With eight tests, the Bonferroni threshold is p < 0.006; the
+smallest p-value observed is 0.11.
+
+The instructive part is what happened between two passes. On the first pass
+(267 → 239 trades, 200 shuffles) two filters looked promising: LVN entries at
++0.494R (p = 0.114) and *avoiding* trades far from the POC at −0.731R
+(p = 0.015). After fixing the sample construction (a calendar-day lookback was
+silently returning nothing inside this dataset's data gaps) and raising the
+shuffles to 2,000, both collapsed: **+0.029R (p = 0.91)** and **−0.261R
+(p = 0.29)**. The first-pass "signals" were artifacts of how the subset was
+drawn — which is exactly what the shuffle test exists to reveal.
+
+There is also a practical point hiding in the account-level numbers. Filtering to
+HVN entries *doubles* per-trade expectancy (+0.276R → +0.438R) and **still loses
+you money**: 90 trades instead of 267 compounds to +21% against +43% for taking
+every trade. Removing two-thirds of a thin edge to double it is a losing trade.
+
+So: the maps stay in the repo as context and research tooling, and they stay out
+of the trading path. The one effect that did survive matched controls in
+`research/map_validation.py` — price travelling ~27% faster through low-volume
+nodes — is a statement about *speed*, not direction, and does not translate into
+an entry filter.
 
 ## 4. Setting expectations honestly
 
@@ -278,6 +353,12 @@ python research/run_all.py
 | `research/validate_live.py` | replays the **shipping** strategy module end-to-end |
 | `research/challenge_sim.py` | prop-challenge pass/fail simulation |
 | `research/check_config_parity.py` | fails if research config drifts from `config.py` |
+| `research/shipping_config.py` | the shipping parameters, read from `config.py` — the harness cannot describe a different system |
+| `research/map_validation.py` | do market-map levels beat distance-matched controls? |
+| `research/map_filter_test.py` | do map context filters improve the trend system's P&L, against a permutation null? |
+| `core/market_map.py` | volume profile, liquidity pools, depth heatmap |
+| `tools/market_map_report.py` | renders the market map (history or live MT5) |
+| `docs/MARKET_MAPS.md` | what the maps are worth, measured |
 
 Strategy and execution changes: `strategies/gold_trend.py`, `config.py`, `main.py`, `core/data_fetcher.py`, `core/trade_manager.py`, `core/risk_manager.py`, `core/time_utils.py`, `strategies/{silver_bullet,raja_banks,pure_price_action}.py`.
 

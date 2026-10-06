@@ -80,7 +80,47 @@ None of that means the picture is useless — traders use profiles for context a
 
 ---
 
-## 3. Honest limitations
+## 3. Using the maps as a filter on the trend system: tested, rejected
+
+Level reactions are one question; whether map context improves an actual trading
+system is another. `research/map_filter_test.py` answers the second: it runs the
+shipping system (H4 Donchian55 / 2xATR stop / 4xATR trail, long-only) over 21.3
+years, annotates every trade with map features computed **only from data before
+the entry**, then splits the trades by each feature.
+
+The control that matters is a **permutation null** — shuffle the feature labels
+2,000 times and see how large a difference appears by chance when ~270 trades are
+split in two.
+
+| Filter | Kept | Expectancy in / out | Difference | p (shuffle) |
+|---|---|---|---|---|
+| Entry in **HVN** (top third of volume-at-price) | 90 / 267 | +0.438R / +0.194R | +0.244R | 0.35 |
+| Entry in **LVN** (bottom third) | 92 / 267 | +0.295R / +0.266R | +0.029R | 0.91 |
+| Pool within 0.21 ATR overhead | 134 / 267 | +0.260R / +0.293R | −0.033R | 0.90 |
+| Entry above the prior week's value area | 226 / 267 | +0.219R / +0.591R | −0.372R | 0.29 |
+| Far from prior session POC | 118 / 267 | +0.131R / +0.392R | −0.261R | 0.29 |
+| Near a round $10 level | 133 / 267 | +0.175R / +0.377R | −0.202R | 0.44 |
+
+**Nothing survives** (Bonferroni threshold for eight tests: p < 0.006; smallest
+observed p = 0.11).
+
+### Two things worth internalising from this
+
+**1. The first pass lied, and the shuffle test caught it.** With a slightly
+different sample (239 trades, 200 shuffles) the same test showed LVN entries at
++0.494R (p = 0.114) and *avoiding* far-from-POC trades at −0.731R (p = 0.015).
+Fixing the sample construction and raising the shuffles to 2,000 collapsed both
+to +0.029R (p = 0.91) and −0.261R (p = 0.29). Neither was real; both were
+artifacts of how the subset was drawn. Any filter you build by slicing history
+should be put through the same mill.
+
+**2. Doubling expectancy can still lose money.** Keeping only HVN entries raises
+per-trade expectancy from +0.276R to +0.438R — a 59% improvement — and the
+account still compounds to **+21% instead of +43%**, because you are taking 90
+trades instead of 267. A thin edge is a *rate* as well as a size; cutting
+two-thirds of your trades to improve the average is usually a losing trade.
+
+## 4. Honest limitations
 
 1. **This is MT5/CFD data, not CME data.** Volume here is broker tick-volume (the M1 set from HistData carries no volume at all, so those frames fall back to a one-unit-per-bar activity proxy). It is an *activity* map, not a true traded-size map. Real volume requires exchange data.
 2. **Volume-at-price is approximated.** Each bar's volume is spread uniformly over its high-low range. On M1/M15 that is close to tick-accurate; on H4 it is a smear.
@@ -91,7 +131,7 @@ None of that means the picture is useless — traders use profiles for context a
 
 ---
 
-## 4. Where this leaves the bot
+## 5. Where this leaves the bot
 
 | Use | Status |
 |---|---|
@@ -99,6 +139,11 @@ None of that means the picture is useless — traders use profiles for context a
 | HVN/LVN for expectations of travel speed | ✅ supported, measured |
 | Liquidity pool map (clustered swing highs/lows) | ✅ supported, **no measured edge as a signal** |
 | Live DOM heatmap recording | ✅ code path exists, untested against a real book |
-| Using any of these as an entry filter in `main.py` | ❌ **not recommended** — no test here supports it |
+| Using any of these as an entry filter in `main.py` | ❌ **rejected by measurement** — see §3: nothing survives the permutation null |
 
-If you want a map effect turned into a tradeable filter, the honest next step is the one in test D: measure whether **entering a trend continuation when price is at an HVN** (grinding, so a breakout there is more meaningful) beats entering at an LVN, with the shipping trend system as the base. That is a P&L test rather than a level test, and `research/` is already set up to run it.
+The HVN/LVN P&L test that §4 used to propose as "the honest next step" has now
+been run — it is §3, and it rejected the filter as well. The next honest step is
+not another single-feature slice (that path has been walked and it produces
+artifacts); it would need either a much larger sample of independent trades or a
+genuinely different information source, such as the order-book depth that this
+stack cannot currently observe.

@@ -181,7 +181,9 @@ LONDON_TIMEZONE = pytz.timezone('Europe/London')
 GOLD_TREND_ENABLED = True
 GOLD_TREND_TIMEFRAME = "H4"      # "H4" (validated) or "H1"
 GOLD_TREND_LOOKBACK = 55         # Donchian window in bars (walk-forward chose 55)
-GOLD_TREND_ATR_PERIOD = 14       # ATR period, matches the research harness
+GOLD_TREND_ATR_PERIOD = 14       # ATR period. research/shipping_config.py reads this
+                                 # value and research/check_config_parity.py asserts
+                                 # the harness cannot drift away from it.
 GOLD_TREND_STOP_ATR = 2.0        # Initial stop = 2.0 x ATR(H4) from entry
 GOLD_TREND_TRAIL_ATR = 4.0       # Chandelier trail = 4.0 x ATR(H4) from the extreme
 GOLD_TREND_REGIME_FILTER = True  # Only buy above the long moving average
