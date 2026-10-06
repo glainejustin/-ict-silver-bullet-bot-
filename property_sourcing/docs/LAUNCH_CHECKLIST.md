@@ -34,7 +34,9 @@ possible, because the hard technical work will already be done.
 - [ ] Register for AML supervision (HMRC or relevant supervisor).
 - [ ] Join a redress scheme (TPO or PRS).
 - [ ] Register with the ICO (data protection).
-- [ ] Get a sourcing agreement / terms of business template reviewed by a solicitor.
+- [ ] Get a sourcing agreement / terms of business template reviewed by a
+      solicitor — a starting draft is in
+      [`docs/SOURCING_AGREEMENT_TEMPLATE.md`](SOURCING_AGREEMENT_TEMPLATE.md).
 - [ ] Open a business bank account in the legal operator's name.
 
 ## Day 1 of going live — technical steps (all in this repo already)

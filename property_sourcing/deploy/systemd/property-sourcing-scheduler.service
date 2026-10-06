@@ -1,0 +1,20 @@
+[Unit]
+Description=Property Sourcing Autopilot - automation scheduler
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Edit these two paths for your server, then:
+#   sudo cp property-sourcing-scheduler.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now property-sourcing-scheduler
+User=www-data
+WorkingDirectory=/opt/property_sourcing
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/property_sourcing/.venv/bin/python scheduler.py
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

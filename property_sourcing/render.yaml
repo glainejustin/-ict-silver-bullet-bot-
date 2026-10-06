@@ -1,0 +1,27 @@
+# Render.com blueprint — https://render.com/docs/blueprint-spec
+# Deploy with: connect this repo on Render, it auto-detects this file.
+# Both services are eligible for Render's free tier for light workloads.
+services:
+  - type: web
+    name: property-sourcing-dashboard
+    env: python
+    plan: free
+    buildCommand: pip install -r property_sourcing/requirements.txt
+    startCommand: cd property_sourcing && gunicorn -b 0.0.0.0:$PORT app:app
+    envVars:
+      - key: DRY_RUN_OUTREACH
+        value: "true"
+      - key: PYTHON_VERSION
+        value: "3.11"
+
+  - type: worker
+    name: property-sourcing-scheduler
+    env: python
+    plan: free
+    buildCommand: pip install -r property_sourcing/requirements.txt
+    startCommand: cd property_sourcing && python scheduler.py
+    envVars:
+      - key: DRY_RUN_OUTREACH
+        value: "true"
+      - key: PYTHON_VERSION
+        value: "3.11"

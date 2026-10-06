@@ -1,0 +1,22 @@
+[Unit]
+Description=Property Sourcing Autopilot - dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Edit these two paths for your server, then:
+#   sudo cp property-sourcing-dashboard.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now property-sourcing-dashboard
+User=www-data
+WorkingDirectory=/opt/property_sourcing
+Environment=PYTHONUNBUFFERED=1
+# For real production use, swap app.py for a WSGI server, e.g.:
+#   ExecStart=/opt/property_sourcing/.venv/bin/gunicorn -b 0.0.0.0:8000 app:app
+ExecStart=/opt/property_sourcing/.venv/bin/python app.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

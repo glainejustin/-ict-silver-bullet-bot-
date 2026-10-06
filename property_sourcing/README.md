@@ -24,18 +24,28 @@ to zero cost and zero daily involvement as realistically possible.
 ## What it actually does, end to end
 
 ```
- Connectors (find signals)  →  AI Agents (think)              →  Outreach (act)
- ───────────────────────       ──────────────────────            ──────────────
- • Companies House            • Comp-finder: values the         • Drafts a personalised
-   (distressed/dissolved        property from real HM Land        email per matched buyer
-   property companies)          Registry sold-price data         • Sends automatically
- • Public auction feeds       • Deal-analyzer: BMV%, refurb         (or waits for your
- • CSV / open-data imports      cost, ROI, strategy, cashflow        one-click approval —
-   (council registers,        • Investor-matcher: finds which        your choice)
-   planning data, manual         buyers in your CRM actually       • Emails YOU a daily
-   leads)                        want this deal                     digest so you rarely
-                                                                      need to open anything
+ Connectors (find signals)       →  AI Agents (think)              →  Outreach (act)
+ ───────────────────────            ──────────────────────            ──────────────
+ • Companies House                  • Comp-finder: values the         • Drafts a personalised
+   (distressed/dissolved              property from real HM Land        email per matched buyer
+   property companies)                Registry sold-price data         • Sends automatically
+ • The Gazette (official           • Deal-analyzer: BMV%, refurb         (or waits for your
+   bankruptcy/winding-up             cost, ROI, strategy, cashflow        one-click approval —
+   notices)                        • Investor-matcher: finds which        your choice)
+ • Brownfield Land Register           buyers in your CRM actually       • Emails YOU a daily
+   (council-identified                want this deal                     digest so you rarely
+   development sites)                                                    need to open anything
+ • Public auction feeds            • PDF deal-pack generator for
+ • Council/open-data CSVs            whoever asks for full details
+   (empty-homes registers etc.)
+ • HM Land Registry corporate
+   ownership (CCOD/OCOD)
+ • Manual entry / CSV import
 ```
+
+Seven free data connectors, all documented in [`connectors/`](connectors/) —
+every one of them no-ops quietly and logs a message if you haven't
+configured it yet, so it's always safe to leave them all switched on.
 
 Everything runs on a schedule (`scheduler.py`) with no human in the loop by
 default, except the two safety switches you control:
@@ -64,6 +74,15 @@ emails without needing a single API key.
      [developer.company-information.service.gov.uk](https://developer.company-information.service.gov.uk/)
    - `AUCTION_FEED_URLS` — public RSS/JSON catalogue feeds from auction
      houses you've checked allow polling
+   - `GAZETTE_SEARCH_TERMS` / `BROWNFIELD_LOCAL_AUTHORITY` — these two
+     connectors (official insolvency notices, council brownfield sites) are
+     free, national and need no signup at all; just enable them in `.env`
+   - `OPEN_DATA_CSV_URLS` — any council empty-homes/vacant-property CSV you
+     find (search "`<council> empty homes register open data`")
+   - `CCOD_CSV_PATH` — optional, most advanced connector: a free one-off
+     account at [use-land-property-data.service.gov.uk](https://use-land-property-data.service.gov.uk/)
+     gets you the full dataset of which companies own which UK properties —
+     turns a vague Companies House signal into an exact address
    - `SMTP_USERNAME` / `SMTP_PASSWORD` — a free Gmail account + an
      [App Password](https://myaccount.google.com/apppasswords)
    - `LLM_PROVIDER` / `LLM_API_KEY` — optional. Leave as `none` for the
@@ -91,9 +110,9 @@ emails without needing a single API key.
 ## Project layout
 
 ```
-connectors/     free, ToS-safe data sources that find raw leads
+connectors/     7 free, ToS-safe data sources that find raw leads
 agents/         the "AI" — valuation, deal scoring, buyer matching, email writing
-outreach/       SMTP sending + the daily digest email to you
+outreach/       SMTP sending, PDF deal-pack generator, the daily digest email
 dashboard/      the Flask web UI templates/assets
 pipeline.py     orchestrates connectors → agents → outreach, one call
 scheduler.py    runs pipeline.py forever, on a timer, unattended
@@ -101,11 +120,12 @@ app.py          the dashboard web server
 run_pipeline.py CLI to run everything once (supports --demo)
 seed/           offline demo data + your buyer CRM starter file
 tests/          automated tests (run `pytest`), including a full offline
-                end-to-end pipeline test
-docs/           legal compliance checklist, launch checklist, deployment guide,
-                architecture notes, getting started
-Dockerfile,
-docker-compose.yml   one-command deployment for when you're ready to go live
+                end-to-end pipeline test and mocked tests for every connector
+docs/           legal compliance checklist, launch checklist, sourcing
+                agreement template, deployment guide, architecture notes
+deploy/systemd/ ready-made systemd service files for VPS deployment
+Dockerfile, docker-compose.yml, Procfile, render.yaml
+                four different one-command deployment options for later
 ```
 
 ## 📋 Not ready to launch yet?

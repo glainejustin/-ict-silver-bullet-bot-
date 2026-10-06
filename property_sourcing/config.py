@@ -39,6 +39,14 @@ LAND_REGISTRY_CACHE_DIR = Path(
 AUCTION_FEED_URLS = [
     u.strip() for u in os.getenv("AUCTION_FEED_URLS", "").split(",") if u.strip()
 ]
+OPEN_DATA_CSV_URLS = [
+    u.strip() for u in os.getenv("OPEN_DATA_CSV_URLS", "").split(",") if u.strip()
+]
+GAZETTE_SEARCH_TERMS = [
+    t.strip() for t in os.getenv("GAZETTE_SEARCH_TERMS", "").split(",") if t.strip()
+] or None  # None lets the connector use its own sensible defaults
+BROWNFIELD_LOCAL_AUTHORITY = os.getenv("BROWNFIELD_LOCAL_AUTHORITY", "") or None
+CCOD_CSV_PATH = os.getenv("CCOD_CSV_PATH", "")
 
 # ---- Outreach ----
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")

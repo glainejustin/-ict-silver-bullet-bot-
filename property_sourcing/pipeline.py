@@ -9,14 +9,39 @@ import config
 import db
 from agents import comp_finder, deal_analyzer, investor_matcher, outreach_writer
 from connectors.auction_feeds import AuctionFeedConnector
+from connectors.brownfield_land import BrownfieldLandConnector
 from connectors.companies_house import CompaniesHouseConnector
+from connectors.corporate_ownership import CorporateOwnershipConnector
+from connectors.gazette_insolvency import GazetteInsolvencyConnector
+from connectors.open_data_csv import OpenDataCsvConnector
 from outreach import email_sender, templates
 
 logger = logging.getLogger(__name__)
 
 
 def get_connectors(extra_csv_paths=None):
-    connectors = [CompaniesHouseConnector(), AuctionFeedConnector()]
+    """Every connector here is free and ToS-safe. Each one no-ops quietly
+    (logs and returns []) if you haven't configured it yet, so it's always
+    safe to leave all of them enabled."""
+    connectors = [
+        CompaniesHouseConnector(),
+        AuctionFeedConnector(),
+        GazetteInsolvencyConnector(search_terms=config.GAZETTE_SEARCH_TERMS),
+        BrownfieldLandConnector(local_authority=config.BROWNFIELD_LOCAL_AUTHORITY),
+        OpenDataCsvConnector(),
+    ]
+    if config.CCOD_CSV_PATH:
+        distressed_company_numbers = {
+            lead["source_ref"]
+            for lead in db.list_leads()
+            if lead["source"] == "companies_house" and lead.get("source_ref")
+        }
+        connectors.append(
+            CorporateOwnershipConnector(
+                ccod_csv_path=config.CCOD_CSV_PATH,
+                target_company_numbers=distressed_company_numbers or None,
+            )
+        )
     if extra_csv_paths:
         from connectors.csv_import import CsvImportConnector
 

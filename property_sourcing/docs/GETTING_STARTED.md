@@ -22,15 +22,29 @@ re-run `python run_pipeline.py --demo` to reload it. The more specific their
 area/budget/strategy, the better the AI's matching.
 
 ## 3. Turn on real data sources
-Copy `.env.example` → `.env`, then:
-- **Companies House** (free): register at
-  developer.company-information.service.gov.uk, paste the key in.
+Copy `.env.example` → `.env`, then enable as many of these free connectors
+as you like — each one no-ops quietly if left unconfigured:
+- **Companies House** (free, needs a key): register at
+  developer.company-information.service.gov.uk, paste the key in. Finds
+  dissolved/distressed property companies.
+- **The Gazette** (free, no key): official bankruptcy/winding-up notices —
+  set `GAZETTE_SEARCH_TERMS` or leave blank for sensible defaults.
+- **Brownfield Land Register** (free, no key): national register of
+  council-identified development sites — set `BROWNFIELD_LOCAL_AUTHORITY`
+  to scope to one council, or leave blank for the latest nationally.
 - **Auction feeds** (free, optional): find a UK auction house's public lot
-  RSS/JSON feed, confirm their terms allow polling, add the URL(s).
+  RSS/JSON feed, confirm their terms allow polling, add the URL(s) to
+  `AUCTION_FEED_URLS`.
+- **Council open-data CSVs** (free): empty-homes/vacant-property registers
+  individual councils publish — add direct CSV URLs to `OPEN_DATA_CSV_URLS`.
+- **HM Land Registry corporate ownership** (free, needs a one-off signup):
+  get the CCOD/OCOD dataset from use-land-property-data.service.gov.uk,
+  set `CCOD_CSV_PATH` — turns a Companies House signal into an exact address.
 - **CSV leads** (free, always available): export anything from a council
   open-data portal, planning register, or your own notes into a CSV with
   columns `address,postcode,property_type,bedrooms,asking_price,motivation_signal`
-  and run `python run_pipeline.py --csv yourfile.csv`.
+  and run `python run_pipeline.py --csv yourfile.csv`, or use the "Add lead
+  manually" button in the dashboard for one-off entries.
 
 ## 4. Turn on real outreach
 - Create (or use) a Gmail account, generate an **App Password**
