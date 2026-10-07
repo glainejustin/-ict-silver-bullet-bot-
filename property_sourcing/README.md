@@ -197,6 +197,9 @@ doesn't permit self-employment), see
 [`docs/LAUNCH_CHECKLIST.md`](docs/LAUNCH_CHECKLIST.md) — it's written
 specifically for "keep building and testing now, flip the switch later"
 and lists exactly what changes (legally and technically) the day you can.
+If you want to take a short, specific list of questions to a paid
+immigration adviser session rather than a general "can I do this" review,
+see [`docs/IMMIGRATION_ADVISER_QUESTIONS.md`](docs/IMMIGRATION_ADVISER_QUESTIONS.md).
 
 ## Why this can't be truly "zero investment or zero involvement"
 

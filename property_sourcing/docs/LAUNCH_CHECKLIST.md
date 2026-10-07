@@ -23,6 +23,13 @@ Neither line should be operated for real — outreach sent, fees taken,
 landlords/tenants contacted for real — until an adviser confirms your status
 allows it.
 
+Not sure what's worth actually paying an adviser to clarify, versus what's
+already settled? See
+[`docs/IMMIGRATION_ADVISER_QUESTIONS.md`](IMMIGRATION_ADVISER_QUESTIONS.md)
+for a short, specific list of the genuinely ambiguous questions (e.g.
+personal buy-to-let investment, open-sourcing the code for free) worth a
+paid session, versus the ones already answered here.
+
 ## Triggers that commonly change what's allowed
 *(confirm current rules for your exact case with an adviser — don't rely on this list)*
 - You're granted **Indefinite Leave to Remain (ILR)** / settled status.
